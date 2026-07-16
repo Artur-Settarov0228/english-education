@@ -294,4 +294,11 @@ pip-selfcheck.json
 .history
 .ionide
 
+# YouTube API Credentials and Tokens
+config/token.json
+config/credentials.json
+config/*.json
+!config/.gitkeep
+
+
 # End of https://www.toptal.com/developers/gitignore/api/python,venv,django,visualstudiocode

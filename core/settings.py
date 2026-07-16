@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'app.common',
     'app.users',
     'app.lessons',
     'app.payments',
@@ -135,3 +137,8 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.User'
+
+# YouTube Integration Settings
+YOUTUBE_CREDENTIALS_FILE = os.getenv('YOUTUBE_CREDENTIALS_FILE', os.path.join(BASE_DIR, 'config', 'credentials.json'))
+YOUTUBE_TOKEN_FILE = os.getenv('YOUTUBE_TOKEN_FILE', os.path.join(BASE_DIR, 'config', 'token.json'))
+

@@ -78,6 +78,23 @@ class Lesson(BaseModel):
     start_time = models.TimeField('Start time', null=True, blank=True)
     end_time = models.TimeField('End time', null=True, blank=True)
     topic = models.CharField('Topic', max_length=255)
+    youtube_video_id = models.CharField('YouTube Video ID', max_length=100, null=True, blank=True)
+    youtube_url = models.URLField('YouTube URL', null=True, blank=True)
+    upload_status = models.CharField(
+        'Upload Status',
+        max_length=50,
+        choices=[
+            ('pending', 'Pending'),
+            ('uploading', 'Uploading'),
+            ('uploaded', 'Uploaded'),
+            ('failed', 'Failed')
+        ],
+        default='pending',
+        null=True,
+        blank=True
+    )
+    uploaded_at = models.DateTimeField('Uploaded at', null=True, blank=True)
+
 
     class Meta:
         verbose_name = 'Lesson'
