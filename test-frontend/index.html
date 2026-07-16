@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>English Education - Premium Video Manager</title>
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Background Glowing Elements -->
+  <div class="blob blob-purple"></div>
+  <div class="blob blob-blue"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-glow"></div>
+        <span class="logo-text">ENGLISH TUTOR</span>
+      </div>
+      <div class="header-status">
+        <span class="status-indicator online"></span>
+        <span class="status-label">YouTube Server: Connected</span>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <div class="dashboard-grid">
+      
+      <!-- Left Side: Form & Controls -->
+      <section class="panel glass form-panel">
+        <div class="panel-header">
+          <h2>Yangi Dars va Video Yuklash</h2>
+          <p>Dars ma'lumotlarini to'ldiring va videoni YouTube'ga yuboring</p>
+        </div>
+
+        <form id="uploadForm" class="upload-form">
+          <!-- Topic -->
+          <div class="form-group">
+            <label for="topic">Dars Mavzusi (Topic)</label>
+            <input type="text" id="topic" placeholder="Masalan: Present Simple introduction" required>
+          </div>
+
+          <!-- Group & Date row -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="group">Guruh (Group)</label>
+              <select id="group" required>
+                <option value="" disabled selected>Yuklanmoqda...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="date">Sana (Date)</label>
+              <input type="date" id="date" required>
+            </div>
+          </div>
+
+          <!-- Time row -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="startTime">Boshlanish vaqti</label>
+              <input type="time" id="startTime">
+            </div>
+            <div class="form-group">
+              <label for="endTime">Tugash vaqti</label>
+              <input type="time" id="endTime">
+            </div>
+          </div>
+
+          <!-- File Upload Drag Drop Area -->
+          <div class="form-group">
+            <label>Dars Videosi</label>
+            <div class="drag-drop-zone" id="dropZone">
+              <input type="file" id="videoFile" accept="video/*" required style="display: none;">
+              <div class="drop-zone-content">
+                <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+                <p class="main-text">Videoni tanlash uchun bosing yoki uni shu yerga tashlang</p>
+                <p class="sub-text">Faqat MP4, MOV, AVI (maksimal 500MB)</p>
+              </div>
+              <div class="selected-file-info" id="fileInfo" style="display: none;">
+                <span class="file-name" id="selectedFileName">video.mp4</span>
+                <button type="button" class="btn-clear" id="btnClearFile">&times;</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="btn-submit" id="btnSubmit">
+            <span class="btn-text">Dars yaratish va Video yuklash</span>
+            <div class="spinner" id="submitSpinner" style="display: none;"></div>
+          </button>
+        </form>
+
+        <!-- Progress Indicator -->
+        <div class="progress-container" id="progressContainer" style="display: none;">
+          <div class="progress-header">
+            <span class="progress-status-text" id="progressStatus">YouTube'ga yuklanmoqda...</span>
+            <span class="progress-percentage" id="progressPercent">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Side: Lessons List -->
+      <section class="panel glass list-panel">
+        <div class="panel-header">
+          <div class="header-with-action">
+            <h2>Mavjud Darslar</h2>
+            <button class="btn-refresh" id="btnRefresh" title="Yangilash">
+              <svg class="refresh-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+            </button>
+          </div>
+          <p>Yaratilgan darslar va ularning YouTube holati</p>
+        </div>
+
+        <!-- Lessons Container -->
+        <div class="lessons-container" id="lessonsContainer">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Darslar ro'yxati yuklanmoqda...</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Video Player Modal Overlay -->
+  <div class="modal-overlay" id="videoModal">
+    <div class="modal-content glass">
+      <button class="modal-close" id="modalClose">&times;</button>
+      <h3 class="modal-title" id="modalTitle">Dars Videosi</h3>
+      <p class="modal-subtitle" id="modalSubtitle">Guruh: A1-7</p>
+      <div class="player-wrapper">
+        <iframe id="videoPlayerFrame" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
