@@ -25,3 +25,4 @@ class Domain(DomainMixin):
 
     def __str__(self):
         return self.domain
+

@@ -55,6 +55,7 @@ TENANT_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'app.users',
     'app.lessons',
     'app.payments',
     'app.tasks',
