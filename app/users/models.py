@@ -1,5 +1,8 @@
+# pyrefly: ignore [missing-import]
 from django.db import models
+# pyrefly: ignore [missing-import]
 from django.contrib.auth.models import AbstractUser
+# pyrefly: ignore [missing-import]
 from django.core.validators import RegexValidator
 from app.common.models import BaseModel
 

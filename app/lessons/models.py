@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 from django.db import models
 from app.common.models import BaseModel
 from app.users.models import User
