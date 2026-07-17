@@ -11,11 +11,6 @@ class LessonVideoUploadSerializer(serializers.Serializer):
     description = serializers.CharField(max_length=5000, required=False, allow_blank=True)
 
     def validate_video_file(self, value):
-        # Limit size to 500MB (adjust as necessary)
-        max_size = 500 * 1024 * 1024  # 500MB
-        if value.size > max_size:
-            raise serializers.ValidationError("File size exceeds the 500MB limit.")
-
         # Limit to common video formats
         allowed_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm']
         ext = os.path.splitext(value.name)[1].lower()

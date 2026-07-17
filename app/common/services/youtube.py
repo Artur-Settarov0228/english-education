@@ -1,4 +1,5 @@
 import os
+import time
 import logging
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -118,18 +119,46 @@ class YouTubeService:
             logger.info(f"Starting resumable YouTube upload for file: {file_path}")
             
             response = None
+            error_count = 0
+            max_errors = 5
+            backoff = 1
+
             while response is None:
-                status, response = request.next_chunk()
-                if status:
-                    progress = int(status.progress() * 100)
-                    logger.info(f"YouTube upload progress: {progress}% completed.")
+                try:
+                    status, response = request.next_chunk()
+                    if status:
+                        progress = int(status.progress() * 100)
+                        logger.info(f"Upload progress: {progress}% completed.")
+                    # Reset backoff on successful chunk upload
+                    backoff = 1
+                    error_count = 0
+                except HttpError as e:
+                    if e.resp.status in [500, 502, 503, 504]:
+                        error_count += 1
+                        if error_count > max_errors:
+                            logger.error(f"YouTube upload failed due to persistent temporary server error 50x: {str(e)}")
+                            raise
+                        logger.warning(f"Temporary server error (50x). Retrying chunk in {backoff} seconds...")
+                        time.sleep(backoff)
+                        backoff *= 2
+                    else:
+                        logger.error(f"YouTube upload failed due to critical client error: {e.content}")
+                        raise
+                except Exception as e:
+                    error_count += 1
+                    if error_count > max_errors:
+                        logger.error(f"YouTube upload failed due to persistent network issues: {str(e)}")
+                        raise
+                    logger.warning(f"Connection glitch during chunk upload. Retrying chunk in {backoff} seconds: {str(e)}")
+                    time.sleep(backoff)
+                    backoff *= 2
 
             video_id = response.get('id')
             if not video_id:
                 raise YouTubeUploadError("YouTube response did not return a video ID.")
 
             video_url = f"https://www.youtube.com/watch?v={video_id}"
-            logger.info(f"Video uploaded successfully. Video ID: {video_id}, URL: {video_url}")
+            logger.info(f"Upload finished. Video ID: {video_id}, URL: {video_url}")
 
             return {
                 "video_id": video_id,
@@ -145,10 +174,67 @@ class YouTubeService:
             logger.error(f"Unexpected error during YouTube upload: {str(e)}")
             raise YouTubeUploadError(f"YouTube upload failed: {str(e)}")
         finally:
-            # Ensure the local temporary file is deleted after the upload attempt
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Cleaned up local video file: {file_path}")
-                except Exception as e:
-                    logger.error(f"Failed to delete local video file {file_path}: {str(e)}")
+            # DO NOT delete local file here. The file will be cleaned up by the periodic Celery task
+            # only after the video finishes processing on YouTube.
+            logger.info("resumable upload attempt finalized (local file retained for verification/processing).")
+
+    def check_processing_status(self, video_id: str) -> dict:
+        """
+        Retrieves processing details of a video from the YouTube API.
+        
+        Args:
+            video_id (str): YouTube video ID.
+            
+        Returns:
+            dict: Containing processing status ('succeeded', 'failed', 'processing') and metadata.
+        """
+        try:
+            service = build('youtube', 'v3', credentials=self.creds)
+            request = service.videos().list(
+                part="status,processingDetails",
+                id=video_id
+            )
+            response = request.execute()
+            
+            items = response.get('items', [])
+            if not items:
+                logger.warning(f"No video found on YouTube with ID: {video_id}")
+                return {
+                    'status': 'not_found',
+                    'failure_reason': 'Video not found on YouTube'
+                }
+                
+            video_item = items[0]
+            status_info = video_item.get('status', {})
+            proc_details = video_item.get('processingDetails', {})
+            
+            upload_status = status_info.get('uploadStatus')
+            proc_status = proc_details.get('processingStatus')
+            
+            logger.info(f"YouTube processing check for {video_id}: uploadStatus={upload_status}, processingStatus={proc_status}")
+            
+            # YouTube status values:
+            # proc_status: 'succeeded', 'failed', 'processing', None
+            # upload_status: 'uploaded', 'processed', 'failed', 'rejected'
+            
+            if proc_status == 'succeeded' or upload_status == 'processed':
+                return {
+                    'status': 'succeeded',
+                    'failure_reason': None
+                }
+            elif proc_status == 'failed' or upload_status in ['failed', 'rejected']:
+                reason = status_info.get('failureReason') or proc_details.get('processingFailureReason') or 'Unknown processing error'
+                return {
+                    'status': 'failed',
+                    'failure_reason': reason
+                }
+            else:
+                return {
+                    'status': 'processing',
+                    'failure_reason': None
+                }
+                
+        except Exception as e:
+            logger.error(f"Error checking YouTube video status for {video_id}: {str(e)}")
+            raise
+

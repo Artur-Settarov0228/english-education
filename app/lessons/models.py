@@ -87,13 +87,18 @@ class Lesson(BaseModel):
             ('pending', 'Pending'),
             ('uploading', 'Uploading'),
             ('uploaded', 'Uploaded'),
-            ('failed', 'Failed')
+            ('failed', 'Failed'),
+            ('PROCESSING', 'Processing'),
+            ('READY', 'Ready'),
+            ('FAILED', 'Failed')
         ],
         default='pending',
         null=True,
         blank=True
     )
     uploaded_at = models.DateTimeField('Uploaded at', null=True, blank=True)
+    failure_reason = models.TextField('Failure reason', null=True, blank=True)
+    local_file_path = models.CharField('Local file path', max_length=500, null=True, blank=True)
 
 
     class Meta:

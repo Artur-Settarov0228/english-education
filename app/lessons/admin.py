@@ -21,6 +21,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
 from django import forms
 import os
 import tempfile
+import threading
 from django.utils import timezone
 from django.contrib import messages
 from app.common.services.youtube import YouTubeService
@@ -37,6 +38,35 @@ class LessonAdminForm(forms.ModelForm):
         model = Lesson
         fields = '__all__'
 
+def upload_video_to_youtube_bg(lesson_id, temp_file_path, title, description):
+    from app.lessons.models import Lesson
+    
+    try:
+        yt_service = YouTubeService()
+        result = yt_service.upload_video(
+            file_path=temp_file_path,
+            title=title,
+            description=description
+        )
+        
+        # Save results
+        Lesson.objects.filter(id=lesson_id).update(
+            youtube_video_id=result['video_id'],
+            youtube_url=result['url'],
+            upload_status='uploaded',
+            uploaded_at=timezone.now()
+        )
+    except Exception:
+        Lesson.objects.filter(id=lesson_id).update(
+            upload_status='failed'
+        )
+    finally:
+        if os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+            except Exception:
+                pass
+
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
     form = LessonAdminForm
@@ -50,41 +80,31 @@ class LessonAdmin(admin.ModelAdmin):
         if video_file:
             # Set status to uploading
             obj.upload_status = 'uploading'
-            obj.save()
-
-            # Save uploaded file to temp file to get a path
+            super().save_model(request, obj, form, change)
+            
+            # Save uploaded file chunks to temp file
             suffix = os.path.splitext(video_file.name)[1]
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
                 for chunk in video_file.chunks():
                     temp_file.write(chunk)
                 temp_file_path = temp_file.name
 
-            try:
-                # Call YouTube upload service
-                yt_service = YouTubeService()
-                result = yt_service.upload_video(
-                    file_path=temp_file_path,
-                    title=obj.topic or f"Lesson: {obj.topic}",
-                    description=f"Video lesson for group {obj.group.name}"
+            # Spawn a background thread to handle the upload to YouTube
+            thread = threading.Thread(
+                target=upload_video_to_youtube_bg,
+                args=(
+                    obj.id, 
+                    temp_file_path, 
+                    obj.topic or f"Lesson: {obj.topic}", 
+                    f"Video lesson for group {obj.group.name}"
                 )
-                
-                # Save result metadata to model
-                obj.youtube_video_id = result['video_id']
-                obj.youtube_url = result['url']
-                obj.upload_status = 'uploaded'
-                obj.uploaded_at = timezone.now()
-                messages.success(request, f"Video muvaffaqiyatli YouTube'ga yuklandi! Video ID: {result['video_id']}")
-            except YouTubeError as e:
-                obj.upload_status = 'failed'
-                messages.error(request, f"YouTube'ga yuklashda xatolik yuz berdi: {str(e)}")
-            finally:
-                if os.path.exists(temp_file_path):
-                    try:
-                        os.remove(temp_file_path)
-                    except Exception:
-                        pass
-        
-        super().save_model(request, obj, form, change)
+            )
+            thread.start()
+            
+            messages.info(request, "Video yuklash fonda (background) boshlandi. Statusni darslar ro'yxatidan kuzatishingiz mumkin.")
+        else:
+            super().save_model(request, obj, form, change)
+
 
 
 

@@ -2,88 +2,121 @@ import os
 import logging
 from celery import shared_task
 from django.utils import timezone
+from django.db import transaction
+
 from app.lessons.models import Lesson
 from app.common.services.youtube import YouTubeService
-from app.common.services.exceptions import YouTubeError
+from app.common.services.youtube_processing import YoutubeProcessingService
 
 logger = logging.getLogger(__name__)
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def upload_lesson_video_to_youtube_task(self, lesson_id, temp_file_path, title, description):
+@shared_task(bind=True, max_retries=3)
+def upload_lesson_video_to_youtube_task(self, lesson_id: int) -> None:
     """
-    Celery background task to upload a lesson video to YouTube.
-    
-    This is highly recommended in production to prevent blocking the Django HTTP
-    request-response cycle, avoiding client gateway timeouts (504).
-    
-    Usage in view:
-        # Instead of calling service inside the view:
-        upload_lesson_video_to_youtube_task.delay(
-            lesson_id=lesson.id,
-            temp_file_path=temp_file_path,
-            title=title,
-            description=description
-        )
+    Celery task to upload a lesson video to YouTube.
+    Runs video conversion pipeline and handles retries with exponential backoff.
     """
-    logger.info(f"Starting Celery background YouTube upload task for Lesson ID: {lesson_id}")
-    
+    logger.info(f"Video received. Starting background upload for Lesson ID: {lesson_id}")
+
     try:
-        lesson = Lesson.objects.get(id=lesson_id)
-    except Lesson.DoesNotExist:
-        logger.error(f"Lesson with ID {lesson_id} does not exist. Aborting upload.")
-        # If the file exists, delete it to prevent storage leaks
-        if os.path.exists(temp_file_path):
+        with transaction.atomic():
             try:
-                os.remove(temp_file_path)
-            except Exception as e:
-                logger.error(f"Failed to delete temp file {temp_file_path}: {str(e)}")
-        return
+                lesson = Lesson.objects.select_for_update().get(id=lesson_id)
+            except Lesson.DoesNotExist:
+                logger.error(f"Lesson ID {lesson_id} not found. Aborting.")
+                return
+            
+            if not lesson.local_file_path or not os.path.exists(lesson.local_file_path):
+                logger.error(f"Local video file not found at '{lesson.local_file_path}'. Aborting upload.")
+                lesson.upload_status = 'FAILED'
+                lesson.failure_reason = "Local video file missing before upload"
+                lesson.save()
+                return
 
-    # Update state to uploading
-    lesson.upload_status = 'uploading'
-    lesson.save()
-
-    try:
-        # Perform upload
-        yt_service = YouTubeService()
-        result = yt_service.upload_video(
-            file_path=temp_file_path,
-            title=title,
-            description=description,
-            privacy="unlisted"
-        )
-
-        # Save success details
-        lesson.youtube_video_id = result['video_id']
-        lesson.youtube_url = result['url']
-        lesson.upload_status = 'uploaded'
-        lesson.uploaded_at = timezone.now()
-        lesson.save()
-        logger.info(f"Celery background upload succeeded for Lesson ID: {lesson_id}")
-
-    except YouTubeError as e:
-        logger.error(f"YouTube Service Error during background upload (Lesson {lesson_id}): {str(e)}")
-        # Check if we should retry or fail
-        try:
-            # Retries the task in case of transient issues (e.g. network glitch)
-            self.retry(exc=e)
-        except self.MaxRetriesExceededError:
-            lesson.upload_status = 'failed'
+            lesson.upload_status = 'uploading'
             lesson.save()
-            # Clean up local file since retries are exhausted
-            if os.path.exists(temp_file_path):
-                try:
-                    os.remove(temp_file_path)
-                except Exception as del_err:
-                    logger.error(f"Failed to delete temp file after max retries: {str(del_err)}")
+
+        # Perform processing & upload
+        processing_service = YoutubeProcessingService()
+        processing_service.process_and_upload(lesson, lesson.local_file_path)
+
+        # Triggers background processing check
+        if lesson.youtube_video_id:
+            check_youtube_processing.delay(lesson.youtube_video_id)
 
     except Exception as e:
-        logger.error(f"Unhandled Exception during background upload (Lesson {lesson_id}): {str(e)}")
-        lesson.upload_status = 'failed'
-        lesson.save()
-        # Clean up local file
-        if os.path.exists(temp_file_path):
+        # Retry with exponential backoff: 60s, 120s, 240s
+        countdown = 60 * (2 ** self.request.retries)
+        logger.warning(
+            f"Upload failed for Lesson {lesson_id}: {str(e)}. "
+            f"Retrying task in {countdown}s (Attempt {self.request.retries + 1}/3)..."
+        )
+        try:
+            self.retry(exc=e, countdown=countdown)
+        except self.MaxRetriesExceededError:
+            logger.error(f"YouTube upload failed after maximum retries for Lesson {lesson_id}.")
+            with transaction.atomic():
+                try:
+                    lesson = Lesson.objects.select_for_update().get(id=lesson_id)
+                    lesson.upload_status = 'FAILED'
+                    lesson.failure_reason = f"Upload failed: {str(e)}"
+                    lesson.save()
+                except Lesson.DoesNotExist:
+                    pass
+
+
+@shared_task
+def check_youtube_processing(video_id: str) -> None:
+    """
+    Task to periodically check the processing status of a video on YouTube.
+    Fires every 30 seconds until status is succeeded or failed.
+    """
+    logger.info(f"Checking processing status on YouTube for Video ID: {video_id}")
+
+    try:
+        lesson = Lesson.objects.get(youtube_video_id=video_id)
+    except Lesson.DoesNotExist:
+        logger.error(f"No lesson found with YouTube Video ID: {video_id}. Aborting checker.")
+        return
+
+    # Check status via YouTube Service
+    try:
+        yt_service = YouTubeService()
+        result = yt_service.check_processing_status(video_id)
+    except Exception as e:
+        logger.error(f"Failed to query YouTube API for video {video_id}: {str(e)}. Retrying status check in 30s...")
+        check_youtube_processing.apply_async(args=[video_id], countdown=30)
+        return
+
+    status = result.get('status')
+    
+    if status == 'succeeded':
+        logger.info(f"Processing completed on YouTube for Video ID: {video_id}. Marking lesson as READY.")
+        
+        local_path = lesson.local_file_path
+        
+        with transaction.atomic():
+            lesson.upload_status = 'READY'
+            lesson.local_file_path = None
+            lesson.save()
+
+        # Delete local file only after upload_status == READY
+        if local_path and os.path.exists(local_path):
             try:
-                os.remove(temp_file_path)
+                os.remove(local_path)
+                logger.info(f"Local file deleted: {local_path}")
             except Exception as del_err:
-                logger.error(f"Failed to delete temp file: {str(del_err)}")
+                logger.error(f"Failed to delete local video file {local_path}: {str(del_err)}")
+
+    elif status == 'failed':
+        logger.error(f"Processing failed on YouTube for Video ID: {video_id}. Reason: {result.get('failure_reason')}")
+        
+        with transaction.atomic():
+            lesson.upload_status = 'FAILED'
+            lesson.failure_reason = result.get('failure_reason')
+            lesson.save()
+
+    else:
+        # Still processing or transient not found, wait and try again in 30 seconds
+        logger.info(f"Waiting for processing: YouTube Video ID {video_id} is still in processing state. Re-scheduling...")
+        check_youtube_processing.apply_async(args=[video_id], countdown=30)
