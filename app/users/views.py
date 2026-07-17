@@ -64,3 +64,8 @@ class LoginView(APIView):
             'access': validated_data['access'],
             'user': user_serializer.data
         }, status=status.HTTP_200_OK)
+
+
+print(
+    "Salom dunyo"
+)
