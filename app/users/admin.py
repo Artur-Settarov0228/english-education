@@ -32,5 +32,9 @@ class CustomGroupAdmin(GroupAdmin):
         return super().has_module_permission(request)
 
 
-admin.site.register(Parents)
-    
+@admin.register(Parents)
+class ParentsAdmin(admin.ModelAdmin):
+    def has_module_permission(self, request):
+        if hasattr(request, 'tenant') and request.tenant.schema_name == 'public':
+            return False
+        return super().has_module_permission(request)
