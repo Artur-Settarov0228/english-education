@@ -8,7 +8,30 @@ from app.lessons.models import Lesson
 from app.common.services.youtube import YouTubeService
 from app.common.services.youtube_processing import YoutubeProcessingService
 
+import requests
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
+
+@shared_task(bind=True, max_retries=3)
+def send_telegram_message_task(self, telegram_id, message):
+    token = getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
+    if not token or not telegram_id:
+        return
+    
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        'chat_id': telegram_id,
+        'text': message,
+        'parse_mode': 'HTML'
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=5)
+        response.raise_for_status()
+    except Exception as e:
+        logger.error(f"Telegram error: {e}")
+        # Agar tarmoq xatosi bo'lsa, qayta urinib ko'rish (Retry)
+        self.retry(exc=e, countdown=5)
 
 @shared_task(bind=True, max_retries=3)
 def upload_lesson_video_to_youtube_task(self, lesson_id: int, schema_name: str) -> None:

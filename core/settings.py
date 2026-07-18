@@ -165,6 +165,9 @@ AUTH_USER_MODEL = 'users.User'
 YOUTUBE_CREDENTIALS_FILE = os.getenv('YOUTUBE_CREDENTIALS_FILE', os.path.join(BASE_DIR, 'config', 'credentials.json'))
 YOUTUBE_TOKEN_FILE = os.getenv('YOUTUBE_TOKEN_FILE', os.path.join(BASE_DIR, 'config', 'token.json'))
 
+# Telegram Bot Token
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+
 # CORS Configuration for local frontend testing
 CORS_ALLOW_ALL_ORIGINS = True
 
