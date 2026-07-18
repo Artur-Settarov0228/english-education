@@ -127,6 +127,6 @@ class AttendanceAdmin(admin.ModelAdmin):
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
-    list_display = ['title', 'course', 'type']
-    list_filter = ['type', 'course']
+    list_display = ['title', 'course']
+    list_filter = ['course']
     search_fields = ['title']

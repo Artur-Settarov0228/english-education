@@ -59,6 +59,14 @@ class AttendanceSerializer(serializers.ModelSerializer):
         fields = ['id', 'lesson', 'student', 'student_name', 'status', 'created_at']
 
 class MaterialSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True, required=False)
+
     class Meta:
         model = Material
         fields = '__all__'
+
+    def validate_file(self, value):
+        max_size = 10 * 1024 * 1024  # 10 MB
+        if value.size > max_size:
+            raise serializers.ValidationError("Fayl hajmi 10 MB dan oshmasligi kerak! (Max 10MB)")
+        return value

@@ -115,8 +115,9 @@ class Lesson(BaseModel):
 
 class Attendance(BaseModel):
     class StatusChoices(models.TextChoices):
-        PRESENT = 'present', 'Present'
-        ABSENT = 'absent', 'Absent'
+        PRESENT = 'present', 'Present (Keldi)'
+        LATE = 'late', 'Late (Kechikdi)'
+        ABSENT = 'absent', 'Absent (Kelmadi)'
 
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='attendances', verbose_name='Lesson')
     student = models.ForeignKey(
@@ -140,20 +141,14 @@ class Attendance(BaseModel):
         return f"{self.student.username} - {self.lesson.topic} - {self.status}"
 
 class Material(BaseModel):
-    class TypeChoices(models.TextChoices):
-        VIDEO = 'video', 'Video'
-        PDF = 'pdf', 'PDF'
-        AUDIO = 'audio', 'Audio'
-        IMAGE = 'image', 'Image'
-
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='materials', verbose_name='Course')
     title = models.CharField('Title', max_length=255)
-    telegram_file_id = models.CharField('Telegram file ID', max_length=255)
-    type = models.CharField('Type', max_length=10, choices=TypeChoices.choices, default=TypeChoices.PDF)
+    link = models.URLField('YouTube/Audio Link', max_length=500, blank=True, null=True, help_text="Audio uchun YouTube ssilkasi")
+    file = models.FileField('File (PDF)', upload_to='materials/', blank=True, null=True, help_text="PDF fayllar uchun")
 
     class Meta:
         verbose_name = 'Material'
         verbose_name_plural = 'Materials'
 
     def __str__(self):
-        return f"{self.title} ({self.get_type_display()})"
+        return self.title
