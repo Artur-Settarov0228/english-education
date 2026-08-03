@@ -58,7 +58,9 @@ def upload_video_to_youtube_bg(lesson_id, temp_file_path, title, description, sc
                 upload_status='uploaded',
                 uploaded_at=timezone.now()
             )
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"YouTube upload failed for lesson {lesson_id}: {str(e)}", exc_info=True)
             Lesson.objects.filter(id=lesson_id).update(
                 upload_status='failed'
             )

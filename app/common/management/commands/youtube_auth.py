@@ -36,7 +36,7 @@ class Command(BaseCommand):
             # We set bind_addr to '0.0.0.0' or just run it with default local server options
             # run_local_server works by printing a URL if it cannot open a browser automatically.
             creds = flow.run_local_server(
-                port=0, 
+                port=8080, 
                 prompt='consent',
                 authorization_prompt_message='Please open this URL in your browser to authorize: {url}'
             )
