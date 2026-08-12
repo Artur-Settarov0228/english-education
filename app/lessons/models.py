@@ -4,9 +4,30 @@ from app.common.models import BaseModel
 from app.users.models import User
 
 class Course(BaseModel):
+    class LevelChoices(models.TextChoices):
+        A1 = 'a1', "Boshlang'ich (A1)"
+        A2 = 'a2', "Elementar (A2)"
+        B1 = 'b1', "O'rta (B1)"
+        B2 = 'b2', "Yuqori O'rta (B2)"
+        C1 = 'c1', "Ilg'or (C1)"
+
+    class CategoryChoices(models.TextChoices):
+        GRAMMAR = 'grammar', 'Grammatika'
+        VOCABULARY = 'vocabulary', "Lug'at"
+        SPEAKING = 'speaking', "So'zlashuv"
+        WRITING = 'writing', 'Yozish'
+
+    class StatusChoices(models.TextChoices):
+        ACTIVE = 'active', 'Faol'
+        DRAFT = 'draft', 'Qoralama'
+
     name = models.CharField('Course name', max_length=255)
     description = models.TextField('Description', blank=True, null=True)
-    monthly_price = models.DecimalField('Monthly price', max_digits=10, decimal_places=2)
+    monthly_price = models.DecimalField('Monthly price', max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    level = models.CharField('Daraja', max_length=20, choices=LevelChoices.choices, default=LevelChoices.A1)
+    category = models.CharField('Toifa', max_length=20, choices=CategoryChoices.choices, default=CategoryChoices.GRAMMAR)
+    status = models.CharField('Holat', max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
 
     class Meta:
         verbose_name = 'Course'

@@ -5,7 +5,7 @@ from .models import User, Parents
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'password', 'first_name', 'last_name', 'email', 'role', 'phone_number', 'avatar']
+        fields = ['id', 'username', 'password', 'first_name', 'last_name', 'email', 'role', 'phone_number', 'avatar', 'is_superuser']
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -20,8 +20,8 @@ class UserSerializer(serializers.ModelSerializer):
 
         # Yaratish (POST) vaqtidagi tekshiruvlar
         if not self.instance:
-            if role_to_create == 'admin':
-                raise serializers.ValidationError("Admin rolida foydalanuvchi yaratish taqiqlangan.")
+            if role_to_create == 'admin' and request_user.role != 'admin':
+                raise serializers.ValidationError("Faqat Admin boshqa Admin yarata oladi.")
             
             if role_to_create == 'manager' and request_user.role != 'admin':
                 raise serializers.ValidationError("Managerlarni faqat Admin yarata oladi.")
@@ -85,5 +85,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         
         # Tokenlarga qo'shimcha ravishda foydalanuvchining rolini qaytaramiz
         data['role'] = self.user.role
+        data['is_superuser'] = self.user.is_superuser
         
         return data

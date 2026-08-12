@@ -8,10 +8,27 @@ from .models import User, Parents
 from .serializers import UserSerializer, ParentsSerializer
 from .permissions import UserAccessPermission
 
+from rest_framework.decorators import action
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [UserAccessPermission]
+
+    @action(detail=False, methods=['get', 'patch', 'put'], permission_classes=[IsAuthenticated])
+    def me(self, request):
+        """
+        Foydalanuvchining o'z profil ma'lumotlarini olish va tahrirlash (GET/PATCH/PUT /api/users/me/)
+        """
+        user = request.user
+        if request.method == 'GET':
+            serializer = self.get_serializer(user)
+            return Response(serializer.data)
+        else:
+            serializer = self.get_serializer(user, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         # Faqat admin va manager foydalanuvchini o'chira oladi (permission qisman buni yopgan, bu yerda aniq qilamiz)

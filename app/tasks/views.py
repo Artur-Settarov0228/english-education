@@ -59,7 +59,17 @@ class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
 
     def get_queryset(self):
+        user = self.request.user
         queryset = Task.objects.all()
+
+        # Agar foydalanuvchi O'quvchi (Student) bo'lsa, faqat u faol a'zo bo'lgan guruh vazifalarini qaytaramiz
+        if hasattr(user, 'role') and user.role == 'student':
+            active_group_ids = Enrollment.objects.filter(
+                student=user, 
+                status='active'
+            ).values_list('group_id', flat=True)
+            queryset = queryset.filter(group_id__in=active_group_ids)
+
         group_id = self.request.query_params.get('group')
         if group_id:
             queryset = queryset.filter(group_id=group_id)
