@@ -94,3 +94,19 @@ class StudentBadgeSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentBadge
         fields = ['id', 'student', 'badge', 'badge_name', 'badge_description', 'badge_icon', 'awarded_at']
+
+
+class VocabularyWordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VocabularyWord
+        fields = ['id', 'vocab_set', 'word', 'translation', 'created_at']
+
+
+class VocabularySetSerializer(serializers.ModelSerializer):
+    group_name = serializers.CharField(source='group.name', read_only=True)
+    words = VocabularyWordSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = VocabularySet
+        fields = ['id', 'group', 'group_name', 'title', 'description', 'words', 'created_at']
+
