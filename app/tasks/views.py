@@ -4,10 +4,11 @@ from rest_framework.response import Response
 from django.db.models import Sum
 from django.utils import timezone
 
-from app.tasks.models import Task, Grade, Submission, QuizQuestion, Badge, StudentBadge
+from app.tasks.models import Task, Grade, Submission, QuizQuestion, Badge, StudentBadge, VocabularySet, VocabularyWord
 from app.tasks.serializers import (
     TaskSerializer, GradeSerializer, SubmissionSerializer,
-    QuizQuestionAdminSerializer, StudentBadgeSerializer
+    QuizQuestionAdminSerializer, StudentBadgeSerializer,
+    VocabularySetSerializer, VocabularyWordSerializer
 )
 from app.lessons.models import Enrollment
 
@@ -256,3 +257,27 @@ class GradeViewSet(viewsets.ModelViewSet):
             analytics_data[skill] = percentage
 
         return Response(analytics_data, status=status.HTTP_200_OK)
+
+
+class VocabularySetViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing vocabulary sets.
+    Supports filtering by group: GET /Tasks/vocab-sets/?group=<group_id>
+    """
+    serializer_class = VocabularySetSerializer
+
+    def get_queryset(self):
+        queryset = VocabularySet.objects.all()
+        group_id = self.request.query_params.get('group')
+        if group_id:
+            queryset = queryset.filter(group_id=group_id)
+        return queryset
+
+
+class VocabularyWordViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing individual words inside vocabulary sets.
+    """
+    queryset = VocabularyWord.objects.all()
+    serializer_class = VocabularyWordSerializer
+
