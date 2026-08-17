@@ -218,3 +218,48 @@ class StudentBadge(BaseModel):
 
     def __str__(self):
         return f"{self.student.username} - {self.badge.name}"
+
+
+class VocabularySet(BaseModel):
+    """
+    Model representing a collection/set of vocabulary words created by teachers for a group.
+    """
+    group = models.ForeignKey(
+        Group, 
+        on_delete=models.CASCADE, 
+        related_name='vocabulary_sets', 
+        verbose_name='Guruh'
+    )
+    title = models.CharField('Mavzu nomi', max_length=255)
+    description = models.TextField('Tavsif', blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Lug'at to'plami"
+        verbose_name_plural = "Lug'at to'plamlari"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} ({self.group.name})"
+
+
+class VocabularyWord(BaseModel):
+    """
+    Model representing a single word and its translation/synonym pair inside a VocabularySet.
+    """
+    vocab_set = models.ForeignKey(
+        VocabularySet, 
+        on_delete=models.CASCADE, 
+        related_name='words', 
+        verbose_name="Lug'at to'plami"
+    )
+    word = models.CharField('Inglizcha so\'z', max_length=255)
+    translation = models.CharField('Tarjimasi / Sinonimi', max_length=255)
+
+    class Meta:
+        verbose_name = "So'z juftligi"
+        verbose_name_plural = "So'z juftliklari"
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.word} -> {self.translation}"
+
