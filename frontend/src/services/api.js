@@ -28,6 +28,10 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user_role');
+      localStorage.removeItem('username');
+      localStorage.removeItem('is_superuser');
+      // Token yaroqsiz bo'lsa yoki yo'qolsa, avtomatik login sahifasiga qaytarish
+      window.location.href = '/';
     }
     return Promise.reject(error);
   }
@@ -51,6 +55,18 @@ export const authService = {
   getProfile: async () => {
     const res = await api.get('/User/users/me/');
     return res.data;
+  },
+  updateProfile: async (userData) => {
+    const res = await api.patch('/User/users/me/', userData);
+    return res.data;
+  },
+  uploadAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const res = await api.patch('/User/users/me/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data;
   }
 };
 
@@ -62,6 +78,10 @@ export const customerService = {
   },
   createOrganization: async (orgData) => {
     const res = await api.post('/Customers/organizations/', orgData);
+    return res.data;
+  },
+  updateOrganization: async (id, orgData) => {
+    const res = await api.patch(`/Customers/organizations/${id}/`, orgData);
     return res.data;
   },
   deleteOrganization: async (id) => {
@@ -157,6 +177,10 @@ export const lessonService = {
   saveAttendance: async (attendanceData) => {
     const res = await api.post('/Lessons/attendance/', attendanceData);
     return res.data;
+  },
+  getEnrollments: async () => {
+    const res = await api.get('/Lessons/enrollments/');
+    return res.data.results || res.data;
   },
   getMaterials: async () => {
     const res = await api.get('/Lessons/materials/');

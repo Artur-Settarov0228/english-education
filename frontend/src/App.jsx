@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import StudentsPage from './pages/StudentsPage';
 import CoursesPage from './pages/CoursesPage';
+import LessonsPage from './pages/LessonsPage';
 import TasksPage from './pages/TasksPage';
 import AttendancePage from './pages/AttendancePage';
 import PaymentsPage from './pages/PaymentsPage';
@@ -36,6 +37,11 @@ export default function App() {
     setIsAuthenticated(false);
   };
 
+  const handleProfileUpdated = async () => {
+    const user = await authService.getProfile();
+    setCurrentUser(user);
+  };
+
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
@@ -49,12 +55,7 @@ export default function App() {
   if (isGlobalSuperAdmin) {
     return (
       <div className="app-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f8fafc' }}>
-        <Header currentUser={currentUser} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 24px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
-           <button onClick={handleLogout} className="btn btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-             Chiqish (Logout)
-           </button>
-        </div>
+        <Header currentUser={currentUser} onLogout={handleLogout} onProfileUpdated={handleProfileUpdated} />
         <main className="page-wrapper" style={{ flex: 1, padding: '24px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
           <SuperAdminPage />
         </main>
@@ -65,19 +66,21 @@ export default function App() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardPage />;
+        return <DashboardPage currentUser={currentUser} />;
       case 'students':
-        return <StudentsPage />;
+        return <StudentsPage currentUser={currentUser} />;
       case 'courses':
-        return <CoursesPage />;
+        return <CoursesPage currentUser={currentUser} />;
+      case 'lessons':
+        return <LessonsPage currentUser={currentUser} />;
       case 'tasks':
-        return <TasksPage />;
+        return <TasksPage currentUser={currentUser} />;
       case 'attendance':
-        return <AttendancePage />;
+        return <AttendancePage currentUser={currentUser} />;
       case 'payments':
-        return <PaymentsPage />;
+        return <PaymentsPage currentUser={currentUser} />;
       default:
-        return <DashboardPage />;
+        return <DashboardPage currentUser={currentUser} />;
     }
   };
 
@@ -93,7 +96,7 @@ export default function App() {
 
       {/* Main Content View */}
       <div className="main-content">
-        <Header currentUser={currentUser} />
+        <Header currentUser={currentUser} onLogout={handleLogout} onProfileUpdated={handleProfileUpdated} />
         <main className="page-wrapper">
           {renderActiveTab()}
         </main>

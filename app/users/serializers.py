@@ -3,16 +3,52 @@ from rest_framework import serializers
 from .models import User, Parents
 
 class UserSerializer(serializers.ModelSerializer):
+    groups_info = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'password', 'first_name', 'last_name', 'email', 'role', 'phone_number', 'avatar', 'is_superuser']
+        fields = ['id', 'username', 'password', 'first_name', 'last_name', 'email', 'role', 'phone_number', 'avatar', 'is_superuser', 'groups_info', 'date_joined']
         extra_kwargs = {
             'password': {'write_only': True}
         }
 
+    def get_groups_info(self, obj):
+        from app.lessons.models import Enrollment, Group
+        if obj.role == 'student':
+            enrollments = Enrollment.objects.filter(student=obj, status='active').select_related('group', 'group__teacher')
+            return [
+                {
+                    'group_name': e.group.name,
+                    'teacher_name': f"{e.group.teacher.first_name or ''} {e.group.teacher.last_name or ''}".strip() or e.group.teacher.username if e.group.teacher else 'Kiritilmagan'
+                }
+                for e in enrollments
+            ]
+        elif obj.role == 'teacher':
+            groups = Group.objects.filter(teacher=obj, status='active')
+            return [
+                {
+                    'group_name': g.name,
+                }
+                for g in groups
+            ]
+        return []
+
     def create(self, validated_data):
         # Parolni hashlash uchun create_user ishlatamiz
         return User.objects.create_user(**validated_data)
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        # Boshqa maydonlarni yangilash
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        # Agar yangi parol kiritilgan bo'lsa
+        if password:
+            instance.set_password(password)
+            
+        instance.save()
+        return instance
 
     def validate(self, attrs):
         request_user = self.context['request'].user

@@ -80,3 +80,40 @@ class OrganizationSerializer(serializers.ModelSerializer):
                     )
 
         return org
+
+    def update(self, instance, validated_data):
+        domain_name = validated_data.pop('domain_name', None)
+        admin_username = validated_data.pop('admin_username', None)
+        admin_password = validated_data.pop('admin_password', None)
+
+        org = super().update(instance, validated_data)
+
+        # Update Domain
+        if domain_name:
+            domain = org.domains.first()
+            if domain:
+                domain.domain = domain_name
+                domain.save()
+            else:
+                Domain.objects.create(
+                    domain=domain_name,
+                    tenant=org,
+                    is_primary=True
+                )
+
+        # Update Admin in tenant schema
+        if admin_username and admin_password and org.schema_name != 'public':
+            with schema_context(org.schema_name):
+                user = User.objects.filter(username=admin_username).first()
+                if user:
+                    user.set_password(admin_password)
+                    user.save()
+                else:
+                    User.objects.create_superuser(
+                        username=admin_username,
+                        email=f"{admin_username}@{org.schema_name}.com",
+                        password=admin_password,
+                        role='admin'
+                    )
+
+        return org

@@ -30,8 +30,8 @@ class Course(BaseModel):
     status = models.CharField('Holat', max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
 
     class Meta:
-        verbose_name = 'Course'
-        verbose_name_plural = 'Courses'
+        verbose_name = 'Kurs'
+        verbose_name_plural = 'Kurslar'
         ordering = ['-created_at']
 
     def __str__(self):
@@ -56,8 +56,8 @@ class Group(BaseModel):
     status = models.CharField('Status', max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
 
     class Meta:
-        verbose_name = 'Group'
-        verbose_name_plural = 'Groups'
+        verbose_name = 'Guruh'
+        verbose_name_plural = 'Guruhlar'
         indexes = [
             models.Index(fields=['status']),
         ]
@@ -83,8 +83,8 @@ class Enrollment(BaseModel):
     status = models.CharField('Status', max_length=20, choices=StatusChoices.choices, default=StatusChoices.ACTIVE)
 
     class Meta:
-        verbose_name = 'Enrollment'
-        verbose_name_plural = 'Enrollments'
+        verbose_name = 'Guruhga qabul'
+        verbose_name_plural = 'Guruhga qabullar'
         unique_together = ('student', 'group')
         indexes = [
             models.Index(fields=['status']),
@@ -124,8 +124,8 @@ class Lesson(BaseModel):
 
 
     class Meta:
-        verbose_name = 'Lesson'
-        verbose_name_plural = 'Lessons'
+        verbose_name = 'Dars'
+        verbose_name_plural = 'Darslar'
         ordering = ['-date']
         indexes = [
             models.Index(fields=['date']),
@@ -151,8 +151,8 @@ class Attendance(BaseModel):
     status = models.CharField('Status', max_length=20, choices=StatusChoices.choices, default=StatusChoices.PRESENT)
 
     class Meta:
-        verbose_name = 'Attendance'
-        verbose_name_plural = 'Attendances'
+        verbose_name = 'Yo\'qlama'
+        verbose_name_plural = 'Yo\'qlamalar'
         unique_together = ('lesson', 'student')
         indexes = [
             models.Index(fields=['status']),
@@ -168,8 +168,8 @@ class Material(BaseModel):
     file = models.FileField('File (PDF)', upload_to='materials/', blank=True, null=True, help_text="PDF fayllar uchun")
 
     class Meta:
-        verbose_name = 'Material'
-        verbose_name_plural = 'Materials'
+        verbose_name = 'O\'quv materiali'
+        verbose_name_plural = 'O\'quv materiallari'
 
     def __str__(self):
         return self.title

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Globe, Trash2, Users, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Building2, Plus, Globe, Trash2, Users, ShieldCheck, RefreshCw, Edit } from 'lucide-react';
 import { customerService } from '../services/api';
 
 export default function SuperAdminPage() {
@@ -7,6 +7,7 @@ export default function SuperAdminPage() {
   const [domains, setDomains] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const [newOrg, setNewOrg] = useState({
     name: '',
@@ -15,6 +16,8 @@ export default function SuperAdminPage() {
     admin_username: '',
     admin_password: ''
   });
+
+  const [editingOrg, setEditingOrg] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -45,6 +48,35 @@ export default function SuperAdminPage() {
     } catch (err) {
       alert("Markaz yaratishda xatolik: " + JSON.stringify(err.response?.data || err.message));
     }
+  };
+
+  const handleUpdateOrg = async (e) => {
+    e.preventDefault();
+    try {
+      await customerService.updateOrganization(editingOrg.id, {
+        domain_name: editingOrg.domain_name,
+        admin_username: editingOrg.admin_username,
+        admin_password: editingOrg.admin_password
+      });
+      setShowEditModal(false);
+      setEditingOrg(null);
+      fetchData();
+    } catch (err) {
+      alert("Markazni tahrirlashda xatolik: " + JSON.stringify(err.response?.data || err.message));
+    }
+  };
+
+  const openEditModal = (org) => {
+    const primaryDomain = org.domains && org.domains.length > 0 ? org.domains[0].domain : `${org.schema_name}.localhost`;
+    setEditingOrg({
+      id: org.id,
+      name: org.name,
+      schema_name: org.schema_name,
+      domain_name: primaryDomain,
+      admin_username: `${org.schema_name}_admin`, // Default guess or could be empty to just allow input
+      admin_password: ''
+    });
+    setShowEditModal(true);
   };
 
   const handleDeleteOrg = async (id, schemaName) => {
@@ -122,62 +154,74 @@ export default function SuperAdminPage() {
             Hozircha o'quv markazlar yo'q. Yuqoridagi "Yangi Markaz Yaratish" tugmasini bosing!
           </div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Markaz Nomi</th>
-                <th>Schema Nomi</th>
-                <th>Subdomen / Domen</th>
-                <th>O'quvchilar</th>
-                <th>O'qituvchilar</th>
-                <th>Adminlar</th>
-                <th>Status</th>
-                <th style={{ width: '80px' }}>Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {organizations.map((org) => {
-                const primaryDomain = org.domains && org.domains.length > 0 ? org.domains[0].domain : `${org.schema_name}.localhost`;
-                return (
-                  <tr key={org.id}>
-                    <td>
-                      <div style={{ fontWeight: '700', color: '#0f172a' }}>{org.name}</div>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>Yaratilgan: {new Date(org.created_on).toLocaleDateString()}</div>
-                    </td>
-                    <td>
-                      <span style={{ background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', color: '#2563eb' }}>
-                        {org.schema_name}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: '600' }}>
-                      <Globe size={14} style={{ verticalAlign: 'middle', marginRight: '6px', color: '#0ea5e9' }} />
-                      {primaryDomain}
-                    </td>
-                    <td style={{ fontWeight: '700' }}>{org.student_count} ta</td>
-                    <td style={{ fontWeight: '700' }}>{org.teacher_count} ta</td>
-                    <td style={{ fontWeight: '700' }}>{org.admin_count} ta</td>
-                    <td>
-                      <span className={`badge ${org.is_active ? 'badge-active' : 'badge-hold'}`}>
-                        {org.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td>
-                      {org.schema_name !== 'public' && (
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ padding: '4px 8px', color: '#ef4444', border: 'none' }}
-                          onClick={() => handleDeleteOrg(org.id, org.schema_name)}
-                          title="Markazni o'chirish"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Markaz Nomi</th>
+                  <th>Schema Nomi</th>
+                  <th>Subdomen / Domen</th>
+                  <th>O'quvchilar</th>
+                  <th>O'qituvchilar</th>
+                  <th>Adminlar</th>
+                  <th>Status</th>
+                  <th style={{ width: '100px' }}>Amallar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {organizations.map((org) => {
+                  const primaryDomain = org.domains && org.domains.length > 0 ? org.domains[0].domain : `${org.schema_name}.localhost`;
+                  return (
+                    <tr key={org.id}>
+                      <td>
+                        <div style={{ fontWeight: '700', color: '#0f172a' }}>{org.name}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>Yaratilgan: {new Date(org.created_on).toLocaleDateString()}</div>
+                      </td>
+                      <td>
+                        <span style={{ background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', color: '#2563eb' }}>
+                          {org.schema_name}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: '600' }}>
+                        <Globe size={14} style={{ verticalAlign: 'middle', marginRight: '6px', color: '#0ea5e9' }} />
+                        {primaryDomain}
+                      </td>
+                      <td style={{ fontWeight: '700' }}>{org.student_count} ta</td>
+                      <td style={{ fontWeight: '700' }}>{org.teacher_count} ta</td>
+                      <td style={{ fontWeight: '700' }}>{org.admin_count} ta</td>
+                      <td>
+                        <span className={`badge ${org.is_active ? 'badge-active' : 'badge-hold'}`}>
+                          {org.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        {org.schema_name !== 'public' && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                              className="btn btn-secondary icon-btn" 
+                              style={{ padding: '4px', color: '#3b82f6', border: 'none', background: 'transparent' }}
+                              onClick={() => openEditModal(org)}
+                              title="Tahrirlash / Parolni o'zgartirish"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button 
+                              className="btn btn-secondary icon-btn" 
+                              style={{ padding: '4px', color: '#ef4444', border: 'none', background: 'transparent' }}
+                              onClick={() => handleDeleteOrg(org.id, org.schema_name)}
+                              title="Markazni o'chirish"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -262,6 +306,63 @@ export default function SuperAdminPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Bekor qilish</button>
                 <button type="submit" className="btn btn-primary">Markazni Yaratish</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Organization / Reset Admin Password */}
+      {showEditModal && editingOrg && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Tahrirlash: {editingOrg.name}</h3>
+            </div>
+            <form onSubmit={handleUpdateOrg}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Subdomen / Domen Nomi</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    required 
+                    placeholder="shokh.localhost yoki shokh.com"
+                    value={editingOrg.domain_name} 
+                    onChange={(e) => setEditingOrg({ ...editingOrg, domain_name: e.target.value })} 
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>Admin Parolini Tiklash (Ixtiyoriy)</h4>
+                  <label>Qaysi Admin Logini?</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Paroli tiklanadigan admin logini (masalan: shokh_admin)"
+                    value={editingOrg.admin_username} 
+                    onChange={(e) => setEditingOrg({ ...editingOrg, admin_username: e.target.value })} 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Yangi Parol (Yangi parolni kiriting)</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Yangi parol (bo'sh qoldirsangiz o'zgarmaydi)"
+                    value={editingOrg.admin_password} 
+                    onChange={(e) => setEditingOrg({ ...editingOrg, admin_password: e.target.value })} 
+                  />
+                  <small style={{ color: '#64748b', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                    Diqqat! Bu amal ko'rsatilgan adminning parolini darhol yangilaydi.
+                  </small>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Bekor qilish</button>
+                <button type="submit" className="btn btn-primary">Saqlash</button>
               </div>
             </form>
           </div>

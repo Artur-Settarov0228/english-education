@@ -37,8 +37,8 @@ class Payment(BaseModel):
     status = models.CharField('Status', max_length=20, choices=StatusChoices.choices, default=StatusChoices.COMPLETED)
 
     class Meta:
-        verbose_name = 'Payment'
-        verbose_name_plural = 'Payments'
+        verbose_name = 'To\'lov'
+        verbose_name_plural = 'To\'lovlar'
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status']),

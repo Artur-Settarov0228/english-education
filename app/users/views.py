@@ -11,9 +11,15 @@ from .permissions import UserAccessPermission
 from rest_framework.decorators import action
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [UserAccessPermission]
+
+    def get_queryset(self):
+        queryset = User.objects.all()
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+        return queryset
 
     @action(detail=False, methods=['get', 'patch', 'put'], permission_classes=[IsAuthenticated])
     def me(self, request):

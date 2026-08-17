@@ -1,30 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { PlayCircle, HelpCircle, BookOpen, Plus, UploadCloud, RefreshCw, Folder, Search, Filter, MoreVertical, Eye, Edit, Trash2, ArrowUpRight, GraduationCap } from 'lucide-react';
-import { lessonService } from '../services/api';
+import { 
+  BookOpen, Folder, FileText, Download, Play, 
+  ExternalLink, Search, Clock, User, CheckCircle, 
+  Sparkles, RefreshCw, Layers
+} from 'lucide-react';
+import { lessonService, authService } from '../services/api';
 
-export default function CoursesPage() {
+export default function CoursesPage({ currentUser }) {
   const [courses, setCourses] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Modals state
-  const [showCourseModal, setShowCourseModal] = useState(false);
-  
-  // Form states
-  const [newCourse, setNewCourse] = useState({ name: '', description: '', monthly_price: '500000.00' });
-
-  const currentUserRole = localStorage.getItem('user_role') || 'student';
+  const [activeTab, setActiveTab] = useState('courses'); // 'courses' or 'materials'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLevel, setSelectedLevel] = useState('All');
+  const [selectedCourseForModal, setSelectedCourseForModal] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const fetchedCourses = await lessonService.getCourses();
-      setCourses(Array.isArray(fetchedCourses) ? fetchedCourses : []);
+      const [coursesRes, groupsRes, materialsRes] = await Promise.all([
+        lessonService.getCourses(),
+        lessonService.getGroups(),
+        lessonService.getMaterials()
+      ]);
 
-      const fetchedGroups = await lessonService.getGroups();
-      setGroups(Array.isArray(fetchedGroups) ? fetchedGroups : []);
+      setCourses(Array.isArray(coursesRes) ? coursesRes : []);
+      setGroups(Array.isArray(groupsRes) ? groupsRes : []);
+      setMaterials(Array.isArray(materialsRes) ? materialsRes : []);
     } catch (err) {
-      console.error("Error fetching courses/groups:", err);
+      console.error("Error fetching courses data:", err);
     } finally {
       setLoading(false);
     }
@@ -34,277 +40,277 @@ export default function CoursesPage() {
     fetchData();
   }, []);
 
-  const handleCreateCourse = async (e) => {
-    e.preventDefault();
-    try {
-      await lessonService.createCourse(newCourse);
-      setShowCourseModal(false);
-      setNewCourse({ name: '', description: '', monthly_price: '500000.00' });
-      fetchData();
-    } catch (err) {
-      alert("Kurs yaratishda xatolik: " + JSON.stringify(err.response?.data || err.message));
-    }
-  };
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (course.description && course.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesLevel = selectedLevel === 'All' || course.level === selectedLevel.toLowerCase();
+    return matchesSearch && matchesLevel;
+  });
 
-  // Mock stats since backend might not have them natively yet
-  const totalCourses = courses.length;
-  const totalGroups = groups.length;
-  const activeCourses = totalCourses; 
-  const totalStudents = 1248; // Mock 
-  
-  // Array of placeholder images for the course cards
-  const placeholderImages = [
-    'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=400',
-    'https://images.unsplash.com/photo-1571260899304-42507011bb6b?auto=format&fit=crop&q=80&w=400',
-    'https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&q=80&w=400',
-    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=400'
-  ];
+  const filteredMaterials = materials.filter(mat => 
+    mat.title?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div>
-      {/* Title & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BookOpen size={24} />
-          </div>
-          <div>
-            <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.5px' }}>
-              Kurslar
-            </h2>
-            <span style={{ fontSize: '14px', color: '#64748b' }}>
-              Tizimdagi barcha ingliz tili kurslarini boshqarish
-            </span>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* Header & Tabs */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
+            Kurslar va O'quv Materiallari
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+            Siz o'rganayotgan darsliklar, PDF qo'llanmalar va audio resurslar
+          </p>
         </div>
 
-        {currentUserRole !== 'admin' && (
-          <button className="btn btn-primary" onClick={() => setShowCourseModal(true)}>
-            <Plus size={16} />
-            <span>Kurs Qo'shish</span>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            className={`btn ${activeTab === 'courses' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('courses')}
+          >
+            <BookOpen size={16} />
+            <span>Kurslar & Guruhlar</span>
           </button>
-        )}
-      </div>
 
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div>
-            <div className="stat-title">Jami Kurslar</div>
-            <div className="stat-value">{totalCourses}</div>
-            <div style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontWeight: '600' }}>
-              <ArrowUpRight size={14} />
-              +5 shu oyda
-            </div>
-          </div>
-          <div className="stat-icon-wrapper">
-            <BookOpen size={20} />
-          </div>
-        </div>
-        <div className="stat-card">
-          <div>
-            <div className="stat-title">Faol Kurslar</div>
-            <div className="stat-value">{activeCourses}</div>
-            <div style={{ width: '100px', height: '4px', background: '#e2e8f0', borderRadius: '4px', marginTop: '12px' }}>
-              <div style={{ width: '75%', height: '100%', background: '#10b981', borderRadius: '4px' }}></div>
-            </div>
-          </div>
-          <div className="stat-icon-wrapper" style={{ background: '#dcfce7', color: '#10b981' }}>
-            <RefreshCw size={20} />
-          </div>
-        </div>
-        <div className="stat-card">
-          <div>
-            <div className="stat-title">Jami O'quvchilar</div>
-            <div className="stat-value">{totalStudents}</div>
-            <div style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontWeight: '600' }}>
-              <ArrowUpRight size={14} />
-              +120 shu oyda
-            </div>
-          </div>
-          <div className="stat-icon-wrapper" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
-            <GraduationCap size={20} />
-          </div>
-        </div>
-        <div className="stat-card">
-          <div>
-            <div className="stat-title">Jami Guruhlar</div>
-            <div className="stat-value">{totalGroups}</div>
-          </div>
-          <div className="stat-icon-wrapper" style={{ background: '#fce7f3', color: '#db2777' }}>
-            <Folder size={20} />
-          </div>
+          <button 
+            className={`btn ${activeTab === 'materials' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('materials')}
+          >
+            <Folder size={16} />
+            <span>O'quv Materiallari ({materials.length})</span>
+          </button>
+
+          <button className="btn btn-secondary" onClick={fetchData} title="Yangilash">
+            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+          </button>
         </div>
       </div>
 
       {/* Filters Toolbar */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <div className="search-box" style={{ width: '300px' }}>
-          <Search size={16} color="#64748b" />
-          <input type="text" placeholder="Kurs nomi yoki daraja bo'yicha qidiruv..." />
+      <div className="card" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '260px' }}>
+          <Search size={18} color="#94a3b8" />
+          <input 
+            type="text"
+            placeholder="Kurs yoki material nomini qidiring..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ border: 'none', outline: 'none', width: '100%', fontSize: '14px', background: 'transparent' }}
+          />
         </div>
-        <select className="select-filter">
-          <option>Barcha Darajalar</option>
-          <option>Boshlang'ich (A1)</option>
-          <option>Elementar (A2)</option>
-        </select>
-        <select className="select-filter">
-          <option>Barcha Toifalar</option>
-          <option>Grammatika</option>
-          <option>So'zlashuv</option>
-        </select>
-        <select className="select-filter">
-          <option>Barcha Holatlar</option>
-          <option>Faol</option>
-          <option>Qoralama</option>
-        </select>
+
+        {activeTab === 'courses' && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Daraja:</span>
+            {['All', 'A1', 'A2', 'B1', 'B2', 'C1'].map(lvl => (
+              <button
+                key={lvl}
+                onClick={() => setSelectedLevel(lvl)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  border: selectedLevel === lvl ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                  background: selectedLevel === lvl ? '#eff6ff' : '#ffffff',
+                  color: selectedLevel === lvl ? '#2563eb' : '#64748b',
+                  cursor: 'pointer'
+                }}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Kurslar yuklanmoqda...</div>
-      ) : courses.length === 0 ? (
-        <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', padding: '16px', background: '#eff6ff', borderRadius: '50%', color: '#2563eb', marginBottom: '16px' }}>
-            <BookOpen size={32} />
+      {/* Tab 1: Courses & Groups */}
+      {activeTab === 'courses' && (
+        loading ? (
+          <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>Kurslar yuklanmoqda...</div>
+        ) : filteredCourses.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
+            Qidiruv bo'yicha kurslar topilmadi.
           </div>
-          <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Hozircha kurslar yo'q</h3>
-          <p style={{ color: '#64748b', marginBottom: '24px' }}>Birinchi ingliz tili kursingizni yaratishdan boshlang.</p>
-          {currentUserRole !== 'admin' && (
-            <button className="btn btn-primary" onClick={() => setShowCourseModal(true)}>
-              <Plus size={16} /> Kurs Yaratish
-            </button>
-          )}
-        </div>
-      ) : (
-        <>
-          {/* Courses Grid Cards */}
-          <div className="courses-grid">
-            {courses.map((course, index) => {
-              const bgImage = placeholderImages[index % placeholderImages.length];
-              const level = ['A1', 'A2', 'B1', 'B2'][index % 4];
-              const progress = [75, 60, 80, 40][index % 4];
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            {filteredCourses.map((course) => {
+              // Find groups belonging to this course
               const courseGroups = groups.filter(g => g.course === course.id);
-              
+              const courseMaterials = materials.filter(m => m.course === course.id);
+
               return (
-                <div key={course.id} className="course-card">
-                  <div className="course-card-image" style={{ backgroundImage: `url(${bgImage})` }}>
-                    <div className="course-card-badge">Faol</div>
-                  </div>
-                  <div className="course-card-content">
-                    <h3 className="course-card-title">{course.name}</h3>
-                    <p className="course-card-desc">{course.description || "Boshlang'ichlar uchun oddiy ingliz tili. Grammatika va lug'at."}</p>
-                    
-                    <div className="course-card-meta">
-                      <span className="course-card-level">{level}</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <PlayCircle size={14} /> {courseGroups.length * 10} Dars
+                <div 
+                  key={course.id} 
+                  className="card" 
+                  style={{ 
+                    padding: '24px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'space-between',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setSelectedCourseForModal({ ...course, groups: courseGroups, materials: courseMaterials })}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                      <span className="badge badge-active" style={{ textTransform: 'uppercase', fontWeight: '800' }}>
+                        {course.level || 'A1'} • {course.category || 'General'}
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <GraduationCap size={14} /> {Math.floor(Math.random() * 300) + 50} O'quvchi
-                      </span>
+                      <span className="badge badge-active">{course.status}</span>
                     </div>
 
-                    <div className="course-card-progress">
-                      <div className="progress-track">
-                        <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>
+                      {course.name}
+                    </h3>
+
+                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.5, marginBottom: '18px' }}>
+                      {course.description || "Ushbu kurs talabalarning ingliz tili darajasini oshirishga yo'naltirilgan."}
+                    </p>
+                  </div>
+
+                  <div>
+                    {/* Course Groups info */}
+                    <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                        Biriktirilgan Guruhlar ({courseGroups.length}):
                       </div>
-                      <span className="progress-label">{progress}%</span>
+                      {courseGroups.length === 0 ? (
+                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>Hozircha guruhlar yo'q</div>
+                      ) : (
+                        courseGroups.map(g => (
+                          <div key={g.id} style={{ fontSize: '12px', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <Clock size={12} color="#2563eb" />
+                            <strong>{g.name}:</strong> {g.schedule || 'Jadval belgilanmagan'}
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                      <span style={{ fontSize: '13px', color: '#2563eb', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Folder size={14} /> {courseMaterials.length} ta material
+                      </span>
+                      <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                        Batafsil ko'rish
+                      </button>
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Table List View */}
-          <div className="table-container">
-            <div className="table-toolbar">
-              <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <BookOpen size={18} color="#2563eb" /> Barcha Kurslar ({courses.length})
-              </h3>
-              <button className="btn btn-secondary">
-                <UploadCloud size={16} /> Yuklab Olish
-              </button>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Kurs Nomi</th>
-                    <th>Daraja</th>
-                    <th>Toifa</th>
-                    <th>Guruhlar</th>
-                    <th>Holat</th>
-                    {currentUserRole !== 'admin' && <th>Harakatlar</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {courses.map((course, index) => {
-                    const level = ['A1', 'A2', 'B1', 'B2'][index % 4];
-                    const category = ['Grammatika', "Lug'at", "So'zlashuv", 'Yozish'][index % 4];
-                    const courseGroups = groups.filter(g => g.course === course.id);
-
-                    return (
-                      <tr key={course.id}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#f1f5f9', overflow: 'hidden' }}>
-                              <img src={placeholderImages[index % placeholderImages.length]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            </div>
-                            <span style={{ fontWeight: '700' }}>{course.name}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ color: '#15803d', fontWeight: '800' }}>{level}</span>
-                        </td>
-                        <td style={{ fontWeight: '600', color: '#475569' }}>{category}</td>
-                        <td style={{ fontWeight: '700' }}>{courseGroups.length}</td>
-                        <td><span className="badge badge-active">Faol</span></td>
-                        {currentUserRole !== 'admin' && (
-                          <td>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <button className="icon-btn"><Eye size={16} /></button>
-                              <button className="icon-btn"><Edit size={16} /></button>
-                              <button className="icon-btn"><MoreVertical size={16} /></button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
+        )
       )}
 
-      {/* Modal: Create Course */}
-      {showCourseModal && (
-        <div className="modal-overlay" onClick={() => setShowCourseModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      {/* Tab 2: Study Materials (PDF & Audio) */}
+      {activeTab === 'materials' && (
+        loading ? (
+          <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>Materiallar yuklanmoqda...</div>
+        ) : filteredMaterials.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
+            Hozircha o'quv materiallari yuklanmagan.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '18px' }}>
+            {filteredMaterials.map((mat) => (
+              <div key={mat.id} className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: mat.link ? '#fee2e2' : '#eff6ff', color: mat.link ? '#ef4444' : '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {mat.link ? <Play size={20} /> : <FileText size={20} />}
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a', margin: '0 0 2px 0' }}>{mat.title}</h4>
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>{mat.link ? 'Audio / YouTube Havola' : 'PDF Qo\'llanma'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
+                  {mat.link && (
+                    <a 
+                      href={mat.link} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="btn btn-primary"
+                      style={{ flex: 1, textDecoration: 'none', justifyContent: 'center', fontSize: '13px' }}
+                    >
+                      <ExternalLink size={14} />
+                      <span>Eshitish / Ko'rish</span>
+                    </a>
+                  )}
+                  {mat.file && (
+                    <a 
+                      href={mat.file} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="btn btn-secondary"
+                      style={{ flex: 1, textDecoration: 'none', justifyContent: 'center', fontSize: '13px' }}
+                    >
+                      <Download size={14} />
+                      <span>PDF Yuklab olish</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Course Details Modal */}
+      {selectedCourseForModal && (
+        <div className="modal-overlay" onClick={() => setSelectedCourseForModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Yangi Kurs Yaratish</h3>
+              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>{selectedCourseForModal.name}</h3>
             </div>
-            <form onSubmit={handleCreateCourse}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Kurs Nomi *</label>
-                  <input type="text" className="form-input" required value={newCourse.name} onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })} placeholder="masalan, Boshlang'ich A1" />
-                </div>
-                <div className="form-group">
-                  <label>Tavsif (Description)</label>
-                  <textarea className="form-textarea" rows="3" value={newCourse.description} onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })} placeholder="Ushbu kurs kimlar uchun..." />
-                </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <span className="badge badge-active">{selectedCourseForModal.level?.toUpperCase()}</span>
+                <p style={{ marginTop: '10px', color: '#475569', fontSize: '14px', lineHeight: 1.6 }}>
+                  {selectedCourseForModal.description || "Ushbu kurs o'quv dasturiga asosan olib boriladi."}
+                </p>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCourseModal(false)}>Bekor Qilish</button>
-                <button type="submit" className="btn btn-primary">Kursni Saqlash</button>
+
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px' }}>Biriktirilgan Guruhlar:</h4>
+                {selectedCourseForModal.groups?.map(g => (
+                  <div key={g.id} style={{ padding: '10px', background: '#f8fafc', borderRadius: '8px', marginBottom: '6px', fontSize: '13px' }}>
+                    <strong>{g.name}</strong> • {g.schedule}
+                  </div>
+                ))}
               </div>
-            </form>
+
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px' }}>Kurs Materiallari:</h4>
+                {selectedCourseForModal.materials?.length === 0 ? (
+                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>Hozircha materiallar yo'q</div>
+                ) : (
+                  selectedCourseForModal.materials?.map(m => (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600' }}>{m.title}</span>
+                      {m.link ? (
+                        <a href={m.link} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '12px' }}>Ochish</a>
+                      ) : (
+                        <a href={m.file} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '12px' }}>Yuklash</a>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={() => setSelectedCourseForModal(null)}>Yopish</button>
+            </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

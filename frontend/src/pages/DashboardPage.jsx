@@ -1,31 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { Users, BookOpen, CheckCircle, RefreshCw } from 'lucide-react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
-import { userService, lessonService } from '../services/api';
+import { 
+  BookOpen, Video, BookMarked, Trophy, Star, Award, 
+  Clock, CheckCircle, AlertCircle, Calendar, RefreshCw,
+  Sparkles, ArrowRight, PlayCircle, ShieldCheck
+} from 'lucide-react';
+import { userService, lessonService, taskService, paymentService } from '../services/api';
 
-export default function DashboardPage() {
+export default function DashboardPage({ currentUser }) {
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalStudents: 0,
-    activeCourses: 0,
+    enrolledGroups: 0,
     completedLessons: 0,
-    overallProgress: 100
+    pendingTasks: 0,
+    totalPoints: 0,
+    attendanceRate: 100
   });
 
-  const [loading, setLoading] = useState(true);
+  const [myGroups, setMyGroups] = useState([]);
+  const [upcomingLessons, setUpcomingLessons] = useState([]);
+  const [pendingTasks, setPendingTasks] = useState([]);
+  const [myBadges, setMyBadges] = useState([]);
+  const [recentAttendance, setRecentAttendance] = useState([]);
 
-  const fetchDashboardData = async () => {
+  const isStudent = !currentUser?.role || currentUser?.role === 'student';
+
+  const fetchStudentData = async () => {
     setLoading(true);
     try {
-      const students = await userService.getUsers('student');
-      const courses = await lessonService.getCourses();
-      const lessons = await lessonService.getLessons();
+      // 1. Fetch groups & courses
+      const [groupsRes, coursesRes, lessonsRes, tasksRes] = await Promise.all([
+        lessonService.getGroups(),
+        lessonService.getCourses(),
+        lessonService.getLessons(),
+        taskService.getTasks()
+      ]);
+
+      const groups = Array.isArray(groupsRes) ? groupsRes : [];
+      const courses = Array.isArray(coursesRes) ? coursesRes : [];
+      const lessons = Array.isArray(lessonsRes) ? lessonsRes : [];
+      const tasks = Array.isArray(tasksRes) ? tasksRes : [];
+
+      setMyGroups(groups);
+      setUpcomingLessons(lessons.slice(0, 4));
+      setPendingTasks(tasks.slice(0, 4));
+
+      // 2. Fetch badges & grades if student id is available
+      let badgesList = [];
+      let totalScore = 0;
+      if (currentUser?.id) {
+        try {
+          const badgesRes = await taskService.getBadges(currentUser.id);
+          badgesList = Array.isArray(badgesRes) ? badgesRes : [];
+          
+          const gradesRes = await taskService.getGrades(currentUser.id);
+          const grades = Array.isArray(gradesRes) ? gradesRes : [];
+          totalScore = grades.reduce((acc, curr) => acc + (parseFloat(curr.score) || 0), 0);
+        } catch (e) {
+          console.log("Grades/Badges fetch error", e);
+        }
+      }
+
+      setMyBadges(badgesList);
 
       setStats({
-        totalStudents: Array.isArray(students) ? students.length : 0,
-        activeCourses: Array.isArray(courses) ? courses.length : 0,
-        completedLessons: Array.isArray(lessons) ? lessons.length : 0,
-        overallProgress: 100
+        enrolledGroups: groups.length,
+        completedLessons: lessons.length,
+        pendingTasks: tasks.length,
+        totalPoints: Math.round(totalScore),
+        attendanceRate: 96
       });
+
     } catch (err) {
       console.error("Dashboard fetch error:", err);
     } finally {
@@ -34,106 +78,260 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    fetchStudentData();
+  }, [currentUser]);
 
-  const dummyEnrollmentTrend = [
-    { month: 'Jan', count: 0 },
-    { month: 'Feb', count: 2 },
-    { month: 'Mar', count: 5 },
-    { month: 'Way', count: 8 },
-    { month: 'Thu', count: stats.totalStudents || 10 }
-  ];
-
-  const dummyProficiency = [
-    { name: 'A1', value: 40, color: '#2563eb' },
-    { name: 'A2', value: 35, color: '#38bdf8' },
-    { name: 'B1', value: 25, color: '#f59e0b' }
-  ];
+  const studentName = currentUser?.first_name 
+    ? `${currentUser.first_name} ${currentUser.last_name || ''}`
+    : currentUser?.username || "O'quvchi";
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '24px', fontWeight: '800' }}>Dashboard</h2>
-          <span style={{ fontSize: '13px', color: '#64748b' }}>Real-time backend ma'lumotlar bazasi statistikasi</span>
+    <div className="student-dashboard" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* 1. Student Hero Welcome Banner */}
+      <div 
+        style={{
+          background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%)',
+          borderRadius: '16px',
+          padding: '28px 32px',
+          color: '#ffffff',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.25)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        <div style={{ position: 'relative', zIndex: 2, maxWidth: '650px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>
+            <Sparkles size={14} color="#fde047" />
+            <span>O'quvchi Portali</span>
+          </div>
+          <h1 style={{ fontSize: '26px', fontWeight: '800', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+            Xush kelibsiz, {studentName}! 👋
+          </h1>
+          <p style={{ fontSize: '14px', color: '#e0e7ff', margin: 0, lineHeight: 1.6 }}>
+            Bugungi darslarni o'zlashtirish, video darslarni tomosha qilish va berilgan topshiriqlarni vaqtida topshirishni unutmang!
+          </p>
         </div>
 
-        <button className="btn btn-secondary" onClick={fetchDashboardData}>
-          <RefreshCw size={16} className={loading ? 'spin' : ''} />
-          <span>Yangilash</span>
-        </button>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+          {/* Points Card */}
+          <div style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)', padding: '14px 20px', borderRadius: '12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '12px', color: '#bfdbfe', fontWeight: '600' }}>To'plangan Ballar</div>
+            <div style={{ fontSize: '24px', fontWeight: '800', color: '#fef08a' }}>{stats.totalPoints} pts</div>
+          </div>
+
+          <button 
+            onClick={fetchStudentData} 
+            className="btn"
+            style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', borderRadius: '12px', padding: '12px', cursor: 'pointer' }}
+            title="Yangilash"
+          >
+            <RefreshCw size={18} className={loading ? 'spin' : ''} />
+          </button>
+        </div>
       </div>
 
-      {/* Top 4 Stats Cards */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div>
-            <div className="stat-title">Jami O'quvchilar</div>
-            <div className="stat-value">{stats.totalStudents}</div>
+      {/* 2. Key Metrics Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' }}>
+        
+        {/* Card 1: My Groups */}
+        <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookOpen size={24} />
           </div>
-          <div className="stat-icon-wrapper"><Users size={22} /></div>
+          <div>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Guruhlarim</div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>{stats.enrolledGroups} ta</div>
+          </div>
         </div>
 
-        <div className="stat-card">
-          <div>
-            <div className="stat-title">Faol Kurslar</div>
-            <div className="stat-value">{stats.activeCourses}</div>
+        {/* Card 2: Lessons */}
+        <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Video size={24} />
           </div>
-          <div className="stat-icon-wrapper" style={{ background: '#e0f2fe', color: '#0ea5e9' }}><BookOpen size={22} /></div>
+          <div>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Darslar & Videolar</div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>{stats.completedLessons} ta</div>
+          </div>
         </div>
 
-        <div className="stat-card">
-          <div>
-            <div className="stat-title">Yaratilgan Darslar</div>
-            <div className="stat-value">{stats.completedLessons}</div>
+        {/* Card 3: Tasks */}
+        <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookMarked size={24} />
           </div>
-          <div className="stat-icon-wrapper" style={{ background: '#dcfce7', color: '#16a34a' }}><CheckCircle size={22} /></div>
+          <div>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Topshiriq & Testlar</div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>{stats.pendingTasks} ta</div>
+          </div>
         </div>
 
-        <div className="stat-card">
-          <div style={{ width: '100%' }}>
-            <div className="stat-title">Umumiy O'zlashtirish</div>
-            <div className="progress-bar-container" style={{ marginTop: '8px' }}>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${stats.overallProgress}%` }} />
-              </div>
-              <span className="progress-label">{stats.overallProgress}%</span>
+        {/* Card 4: Attendance */}
+        <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#faf5ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Davomat Ko'rsatkichi</div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>{stats.attendanceRate}%</div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 3. Main Sections Layout (2 Columns) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+        
+        {/* Left Column: My Groups & Schedule */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BookOpen size={18} color="#2563eb" />
+              <span>Mening Faol Guruhlarim</span>
+            </h3>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Jadval & O'qituvchi</span>
+          </div>
+
+          {myGroups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b', fontSize: '14px' }}>
+              Hozircha biriktirilgan guruhlar mavjud emas.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {myGroups.map((group) => (
+                <div 
+                  key={group.id} 
+                  style={{ 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '12px', 
+                    padding: '16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: '#f8fafc'
+                  }}
+                >
+                  <div>
+                    <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>{group.name}</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: '#64748b' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Clock size={14} /> {group.schedule || 'Har kuni'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="badge badge-active">Faol</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Upcoming Lessons & Videos */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Video size={18} color="#16a34a" />
+              <span>So'nggi Darslar & Videolar</span>
+            </h3>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Video darslar</span>
+          </div>
+
+          {upcomingLessons.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b', fontSize: '14px' }}>
+              Hozircha darslar ro'yxati mavjud emas.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {upcomingLessons.map((lesson) => (
+                <div 
+                  key={lesson.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    background: '#ffffff'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <PlayCircle size={20} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>{lesson.topic}</div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>{lesson.date} • {lesson.group_name || 'Guruh'}</div>
+                    </div>
+                  </div>
+
+                  {lesson.youtube_video_id || lesson.youtube_url ? (
+                    <span className="badge badge-active" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Video size={12} /> Video Mavjud
+                    </span>
+                  ) : (
+                    <span className="badge badge-hold">Rejalashtirilgan</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* 4. Student Badges & Gamification Section */}
+      <div className="card" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Trophy size={18} color="#eab308" />
+            <span>Mening Yutuqlarim va Nishonlarim (Achievements)</span>
+          </h3>
+          <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Gamification</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+          
+          {/* Badge 1: Streak Hero */}
+          <div style={{ border: '1px solid #fef08a', background: 'linear-gradient(135deg, #fefce8, #fef9c3)', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#eab308', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(234, 179, 8, 0.3)' }}>
+              <Trophy size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '800', color: '#854d0e' }}>Streak Hero ⚡</div>
+              <div style={{ fontSize: '12px', color: '#a16207' }}>5 ta vazifani o'z vaqtida topshirganlik uchun</div>
             </div>
           </div>
+
+          {/* Badge 2: Grammar Guru */}
+          <div style={{ border: '1px solid #bfdbfe', background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(37, 99, 235, 0.3)' }}>
+              <Star size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '800', color: '#1e40af' }}>Grammar Guru ⭐</div>
+              <div style={{ fontSize: '12px', color: '#1d4ed8' }}>Grammatika testidan 100% natija</div>
+            </div>
+          </div>
+
+          {/* Badge 3: Master of Attendance */}
+          <div style={{ border: '1px solid #bbf7d0', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#16a34a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(22, 163, 74, 0.3)' }}>
+              <CheckCircle size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '800', color: '#166534' }}>Intizomli O'quvchi 🎯</div>
+              <div style={{ fontSize: '12px', color: '#15803d' }}>Darslarni qoldirmasdan qatnashgan</div>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      {/* Charts Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-        <div className="card">
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px' }}>O'quvchilar Qabul Dynamic Grafigi</h3>
-          <div style={{ width: '100%', height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dummyEnrollmentTrend}>
-                <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
-                <YAxis stroke="#94a3b8" fontSize={12} />
-                <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="card">
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Til Darajalari Taqsimoti</h3>
-          <div style={{ width: '100%', height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={dummyProficiency} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value">
-                  {dummyProficiency.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

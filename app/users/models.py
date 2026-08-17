@@ -23,8 +23,8 @@ class User(AbstractUser, BaseModel):
     avatar = models.ImageField('Avatar', upload_to='avatars/', blank=True, null=True)
 
     class Meta:
-        verbose_name = 'User'
-        verbose_name_plural = 'Users'
+        verbose_name = 'Foydalanuvchi'
+        verbose_name_plural = 'Foydalanuvchilar'
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"

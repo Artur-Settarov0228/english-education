@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, MoreHorizontal, Trash2, ShieldCheck, UserCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Trash2, ShieldCheck, UserCheck, AlertCircle, RefreshCw, Edit } from 'lucide-react';
 import QuickViewDrawer from '../components/QuickViewDrawer';
 import { userService } from '../services/api';
 
@@ -10,7 +10,10 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [levelFilter, setLevelFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  
   const [telegramStatus, setTelegramStatus] = useState(null);
   
   const [newStudent, setNewStudent] = useState({
@@ -21,6 +24,9 @@ export default function StudentsPage() {
     phone_number: '',
     role: 'student'
   });
+
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editPassword, setEditPassword] = useState('');
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -75,7 +81,41 @@ export default function StudentsPage() {
     }
   };
 
-  const handleDeleteStudent = async (id) => {
+  const handleUpdateStudent = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        username: editingStudent.username,
+        first_name: editingStudent.first_name,
+        last_name: editingStudent.last_name,
+        phone_number: editingStudent.phone_number,
+        role: editingStudent.role
+      };
+      
+      // Faqat kiritilgan bo'lsa parolni yangilaymiz
+      if (editPassword) {
+        payload.password = editPassword;
+      }
+      
+      await userService.updateUser(editingStudent.id, payload);
+      setShowEditModal(false);
+      setEditingStudent(null);
+      setEditPassword('');
+      fetchStudents();
+    } catch (err) {
+      alert("Tahrirlashda xatolik: " + JSON.stringify(err.response?.data || err.message));
+    }
+  };
+
+  const openEditModal = (student, e) => {
+    e.stopPropagation();
+    setEditingStudent(student);
+    setEditPassword('');
+    setShowEditModal(true);
+  };
+
+  const handleDeleteStudent = async (id, e) => {
+    e.stopPropagation();
     if (window.confirm("Haqiqatdan ham ushbu foydalanuvchini o'chirmoqchimisiz?")) {
       try {
         await userService.deleteUser(id);
@@ -86,6 +126,8 @@ export default function StudentsPage() {
       }
     }
   };
+
+  const currentUserRole = localStorage.getItem('user_role') || 'student';
 
   return (
     <div style={{ position: 'relative' }}>
@@ -104,10 +146,12 @@ export default function StudentsPage() {
             <span>Yangilash</span>
           </button>
 
-          <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-            <Plus size={18} />
-            <span>Yangi Foydalanuvchi Qo'shish</span>
-          </button>
+          {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
+            <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+              <Plus size={18} />
+              <span>Yangi Foydalanuvchi Qo'shish</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -124,7 +168,9 @@ export default function StudentsPage() {
           <div className="table-filters">
             <select className="select-filter" value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)}>
               <option value="All">Barcha Rollar / Darajalar</option>
-              <option value="manager">Manager</option>
+              {currentUserRole === 'admin' && <option value="admin">Admin</option>}
+              {currentUserRole === 'admin' && <option value="manager">Manager</option>}
+              <option value="teacher">Teacher</option>
               <option value="student">Student</option>
             </select>
           </div>
@@ -149,69 +195,97 @@ export default function StudentsPage() {
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
             Hozircha ma'lumotlar topilmadi.<br />
           </div>
-
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: '40px' }}><input type="checkbox" /></th>
-                <th>Username & Ism</th>
-                <th>Telefon Raqami</th>
-                <th>Rol</th>
-                <th>Telegram Holati</th>
-                <th>Yaratilgan Vaqti</th>
-                <th style={{ width: '80px' }}>Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStudents.map((student) => {
-                const isSelected = selectedStudent?.id === student.id;
-                const displayName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || student.username;
-                return (
-                  <tr 
-                    key={student.id} 
-                    onClick={() => setSelectedStudent(student)}
-                    style={{ cursor: 'pointer', background: isSelected ? '#f1f5f9' : 'transparent' }}
-                  >
-                    <td onClick={(e) => e.stopPropagation()}><input type="checkbox" /></td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#e0f2fe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyCenter: 'center', fontWeight: '700' }}>
-                          {student.username ? student.username.charAt(0).toUpperCase() : 'U'}
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40px' }}><input type="checkbox" /></th>
+                  <th>Username & Ism</th>
+                  <th>Telefon Raqami</th>
+                  <th>Rol</th>
+                  <th>Guruh va Ustoz</th>
+                  <th>Telegram Holati</th>
+                  <th>Yaratilgan Vaqti</th>
+                  <th style={{ width: '100px' }}>Amallar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.map((student) => {
+                  const isSelected = selectedStudent?.id === student.id;
+                  const displayName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || student.username;
+                  return (
+                    <tr 
+                      key={student.id} 
+                      onClick={() => setSelectedStudent(student)}
+                      style={{ cursor: 'pointer', background: isSelected ? '#f1f5f9' : 'transparent' }}
+                    >
+                      <td onClick={(e) => e.stopPropagation()}><input type="checkbox" /></td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#e0f2fe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
+                            {student.username ? student.username.charAt(0).toUpperCase() : 'U'}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: '700' }}>{displayName}</div>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>@{student.username}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: '700' }}>{displayName}</div>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>@{student.username}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{student.phone_number || 'Kiritilmagan'}</td>
-                    <td><span className="badge badge-active">{student.role}</span></td>
-                    <td>
-                      {telegramStatus && selectedStudent?.id === student.id && telegramStatus.status === 'success' ? (
-                        <span className="badge badge-active"><ShieldCheck size={12} style={{ marginRight: '4px' }} /> Telegram Ulangan</span>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>Kutilmoqda</span>
-                      )}
-                    </td>
-                    <td style={{ fontSize: '12px', color: '#64748b' }}>
-                      {student.created_at ? new Date(student.created_at).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button 
-                        className="btn btn-secondary" 
-                        style={{ padding: '4px 8px', color: '#ef4444', border: 'none' }}
-                        onClick={() => handleDeleteStudent(student.id)}
-                        title="O'chirish"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>{student.phone_number || 'Kiritilmagan'}</td>
+                      <td><span className="badge badge-active">{student.role}</span></td>
+                      <td>
+                        {student.groups_info && student.groups_info.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {student.groups_info.map((g, idx) => (
+                              <div key={idx} style={{ fontSize: '12px', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                                <span style={{ fontWeight: '600', color: '#334155' }}>{g.group_name}</span>
+                                {g.teacher_name && <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Ustoz: {g.teacher_name}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
+                        )}
+                      </td>
+                      <td>
+                        {telegramStatus && selectedStudent?.id === student.id && telegramStatus.status === 'success' ? (
+                          <span className="badge badge-active"><ShieldCheck size={12} style={{ marginRight: '4px' }} /> Telegram Ulangan</span>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#64748b' }}>Kutilmoqda</span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '12px', color: '#64748b' }}>
+                        {student.date_joined ? new Date(student.date_joined).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {student.role !== 'admin' && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                              className="btn btn-secondary icon-btn" 
+                              style={{ padding: '4px', color: '#3b82f6', border: 'none', background: 'transparent' }}
+                              onClick={(e) => openEditModal(student, e)}
+                              title="Tahrirlash / Parolni o'zgartirish"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button 
+                              className="btn btn-secondary icon-btn" 
+                              style={{ padding: '4px', color: '#ef4444', border: 'none', background: 'transparent' }}
+                              onClick={(e) => handleDeleteStudent(student.id, e)}
+                              title="O'chirish"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -235,7 +309,7 @@ export default function StudentsPage() {
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Django Bazaga Yangi Foydalanuvchi Qo'shish</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Yangi Foydalanuvchi Qo'shish</h3>
             </div>
             <form onSubmit={handleAddStudent}>
               <div className="modal-body">
@@ -247,7 +321,8 @@ export default function StudentsPage() {
                     onChange={(e) => setNewStudent({ ...newStudent, role: e.target.value })}
                   >
                     <option value="student">Student</option>
-                    {localStorage.getItem('user_role') === 'admin' && (
+                    <option value="teacher">Teacher</option>
+                    {currentUserRole === 'admin' && (
                       <option value="manager">Manager</option>
                     )}
                   </select>
@@ -291,7 +366,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Telefon Raqam (+998901234567 formatida)</label>
+                  <label>Telefon Raqam (+998...)</label>
                   <input 
                     type="text" 
                     className="form-input" 
@@ -306,7 +381,98 @@ export default function StudentsPage() {
                   Bekor qilish
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Bazaga Saqlash
+                  Saqlash
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal Form */}
+      {showEditModal && editingStudent && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Tahrirlash: @{editingStudent.username}</h3>
+            </div>
+            <form onSubmit={handleUpdateStudent}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Login (Username) *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    required
+                    value={editingStudent.username}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, username: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Yangi Parol (ixtiyoriy)</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Parolni almashtirish uchun kiriting"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                    Agar parol esdan chiqqan bo'lsa, shu yerdan yangilab berishingiz mumkin.
+                  </small>
+                </div>
+                
+                <div className="form-group">
+                  <label>Rol (Daraja)</label>
+                  <select 
+                    className="form-select"
+                    value={editingStudent.role}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, role: e.target.value })}
+                    disabled={currentUserRole !== 'admin' && editingStudent.role === 'admin'}
+                  >
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher</option>
+                    {currentUserRole === 'admin' && <option value="manager">Manager</option>}
+                    {currentUserRole === 'admin' && <option value="admin">Admin</option>}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Ismi</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={editingStudent.first_name || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, first_name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Familiyasi</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={editingStudent.last_name || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, last_name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Telefon Raqam</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="+998901234567"
+                    value={editingStudent.phone_number || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, phone_number: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>
+                  Bekor qilish
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Saqlash
                 </button>
               </div>
             </form>

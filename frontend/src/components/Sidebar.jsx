@@ -9,25 +9,27 @@ import {
   CreditCard,
   CalendarCheck,
   Building2,
-  LogOut
+  LogOut,
+  Video
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab, userRole, onLogout }) {
   let navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Bosh Sahifa', icon: LayoutDashboard },
     { id: 'students', label: 'Students', icon: Users },
-    { id: 'courses', label: 'Courses', icon: BookOpen },
-    { id: 'tasks', label: 'Tasks & Quizzes', icon: BookMarked },
+    { id: 'courses', label: 'Kurslar & Materiallar', icon: BookOpen },
+    { id: 'lessons', label: 'Video Darslar', icon: Video },
+    { id: 'tasks', label: 'Vazifa & Testlar', icon: BookMarked },
     { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
-    { id: 'payments', label: 'Payments', icon: CreditCard },
+    { id: 'payments', label: "To'lovlarim", icon: CreditCard },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   if (userRole === 'teacher') {
-    navItems = navItems.filter(item => ['dashboard', 'courses', 'tasks', 'attendance'].includes(item.id));
+    navItems = navItems.filter(item => ['dashboard', 'courses', 'lessons', 'tasks', 'attendance'].includes(item.id));
   } else if (userRole === 'student') {
-    navItems = navItems.filter(item => ['dashboard', 'courses', 'tasks', 'payments'].includes(item.id));
+    navItems = navItems.filter(item => ['dashboard', 'courses', 'lessons', 'tasks', 'payments'].includes(item.id));
   }
 
   return (
