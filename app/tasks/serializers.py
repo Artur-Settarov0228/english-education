@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from app.tasks.models import Task, Grade, Submission, QuizQuestion, Badge, StudentBadge
+from app.tasks.models import Task, Grade, Submission, QuizQuestion, Badge, StudentBadge, VocabularySet, VocabularyWord
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
     """
