@@ -29,6 +29,7 @@ urlpatterns = [
     path('Lessons/', include('app.lessons.urls')),
     path('Tasks/', include('app.tasks.urls')),
     path('User/', include('app.users.urls')),
+    path('Payments/', include('app.payments.urls')),
     
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

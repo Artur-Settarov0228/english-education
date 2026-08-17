@@ -1,14 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { 
   CreditCard, CheckCircle2, Clock, RefreshCw, 
-  FileText, Download, ShieldCheck, DollarSign, X
+  FileText, Download, ShieldCheck, DollarSign, X, Plus
 } from 'lucide-react';
-import { paymentService } from '../services/api';
+import { paymentService, userService, lessonService } from '../services/api';
 
 export default function PaymentsPage({ currentUser }) {
   const [payments, setPayments] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+
+  // Manager Payment Creation Modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newPayment, setNewPayment] = useState({
+    student: '',
+    group: '',
+    amount: '500000.00',
+    payment_month: new Date().toISOString().split('T')[0],
+    method: 'cash',
+    status: 'completed'
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+
+  const isManagerOrAdmin = currentUser?.role === 'manager' || currentUser?.role === 'admin' || currentUser?.is_superuser;
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -16,6 +32,15 @@ export default function PaymentsPage({ currentUser }) {
       const res = await paymentService.getPayments();
       const pList = Array.isArray(res) ? res : [];
       setPayments(pList);
+
+      if (isManagerOrAdmin) {
+        const [studentsRes, groupsRes] = await Promise.all([
+          userService.getUsers('student'),
+          lessonService.getGroups()
+        ]);
+        setStudents(Array.isArray(studentsRes) ? studentsRes : []);
+        setGroups(Array.isArray(groupsRes) ? groupsRes : []);
+      }
     } catch (err) {
       console.error("Payments fetch error:", err);
     } finally {
@@ -25,7 +50,35 @@ export default function PaymentsPage({ currentUser }) {
 
   useEffect(() => {
     fetchPayments();
-  }, []);
+  }, [currentUser]);
+
+  const handleCreatePayment = async (e) => {
+    e.preventDefault();
+    if (!newPayment.student || !newPayment.amount) {
+      alert("Iltimos, o'quvchi va summani tanlang!");
+      return;
+    }
+
+    setSavingPayment(true);
+    try {
+      await paymentService.createPayment(newPayment);
+      alert("To'lov muvaffaqiyatli qabul qilindi va o'quvchi hisobida aks ettirildi!");
+      setShowAddModal(false);
+      setNewPayment({
+        student: '',
+        group: '',
+        amount: '500000.00',
+        payment_month: new Date().toISOString().split('T')[0],
+        method: 'cash',
+        status: 'completed'
+      });
+      fetchPayments();
+    } catch (err) {
+      alert("To'lov kiritishda xatolik: " + JSON.stringify(err.response?.data || err.message));
+    } finally {
+      setSavingPayment(false);
+    }
+  };
 
   const totalPaid = payments
     .filter(p => p.status === 'completed')
@@ -38,17 +91,26 @@ export default function PaymentsPage({ currentUser }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
-            To'lovlarim & Kvitansiyalar
+            {isManagerOrAdmin ? "To'lovlar Boshqaruvi" : "To'lovlarim & Kvitansiyalar"}
           </h2>
           <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-            Kurs uchun amalga oshirilgan to'lovlar tarixi va cheklar
+            {isManagerOrAdmin ? "O'quvchilar to'lovlarini qabul qilish va boshqarish" : "Kurs uchun amalga oshirilgan to'lovlar tarixi va cheklar"}
           </p>
         </div>
 
-        <button className="btn btn-secondary" onClick={fetchPayments} title="Yangilash">
-          <RefreshCw size={16} className={loading ? 'spin' : ''} />
-          <span>Yangilash</span>
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {isManagerOrAdmin && (
+            <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+              <Plus size={16} />
+              <span>Yangi To'lov Qabul Qilish</span>
+            </button>
+          )}
+
+          <button className="btn btn-secondary" onClick={fetchPayments} title="Yangilash">
+            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+            <span>Yangilash</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -59,7 +121,9 @@ export default function PaymentsPage({ currentUser }) {
             <CreditCard size={24} />
           </div>
           <div>
-            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Jami To'langan</div>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+              {isManagerOrAdmin ? "Jami Tushum" : "Jami To'langan"}
+            </div>
             <div style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a' }}>
               {totalPaid.toLocaleString()} UZS
             </div>
@@ -96,7 +160,7 @@ export default function PaymentsPage({ currentUser }) {
       <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-            To'lovlar Tarixi
+            To'lovlar Ro'yxati
           </h3>
         </div>
 
@@ -111,6 +175,7 @@ export default function PaymentsPage({ currentUser }) {
             <thead>
               <tr>
                 <th>To'lov ID</th>
+                {isManagerOrAdmin && <th>O'quvchi</th>}
                 <th>To'lov Oyi / Sanasi</th>
                 <th>Miqdori</th>
                 <th>To'lov Turi</th>
@@ -122,6 +187,11 @@ export default function PaymentsPage({ currentUser }) {
               {payments.map((p) => (
                 <tr key={p.id}>
                   <td style={{ fontWeight: '700', color: '#64748b' }}>#{p.id}</td>
+                  {isManagerOrAdmin && (
+                    <td style={{ fontWeight: '700' }}>
+                      {p.student_name || p.student_username || `Student #${p.student}`}
+                    </td>
+                  )}
                   <td style={{ fontWeight: '600' }}>{p.payment_month || p.created_at?.split('T')[0] || 'N/A'}</td>
                   <td style={{ fontWeight: '800', color: '#2563eb' }}>
                     {parseFloat(p.amount).toLocaleString()} UZS
@@ -153,6 +223,92 @@ export default function PaymentsPage({ currentUser }) {
         )}
       </div>
 
+      {/* Manager Add Payment Modal */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Yangi To'lov Qabul Qilish</h3>
+            </div>
+            <form onSubmit={handleCreatePayment}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="form-group">
+                  <label>O'quvchi *</label>
+                  <select 
+                    className="form-select"
+                    required
+                    value={newPayment.student}
+                    onChange={(e) => setNewPayment({ ...newPayment, student: e.target.value })}
+                  >
+                    <option value="">-- O'quvchini tanlang --</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.first_name ? `${s.first_name} ${s.last_name || ''}` : s.username} (@{s.username})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Guruh (ixtiyoriy)</label>
+                  <select 
+                    className="form-select"
+                    value={newPayment.group}
+                    onChange={(e) => setNewPayment({ ...newPayment, group: e.target.value })}
+                  >
+                    <option value="">-- Guruhni tanlang --</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>To'lov Summasi (UZS) *</label>
+                  <input 
+                    type="number"
+                    className="form-input"
+                    required
+                    value={newPayment.amount}
+                    onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>To'lov Oyi *</label>
+                  <input 
+                    type="date"
+                    className="form-input"
+                    required
+                    value={newPayment.payment_month}
+                    onChange={(e) => setNewPayment({ ...newPayment, payment_month: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>To'lov Usuli</label>
+                  <select 
+                    className="form-select"
+                    value={newPayment.method}
+                    onChange={(e) => setNewPayment({ ...newPayment, method: e.target.value })}
+                  >
+                    <option value="cash">Naqd pul (Cash)</option>
+                    <option value="payme">Payme</option>
+                    <option value="click">Click</option>
+                    <option value="card">Plastik karta</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
+                  Bekor qilish
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={savingPayment}>
+                  <span>{savingPayment ? "Saqlanmoqda..." : "To'lovni Tasdiqlash"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Receipt Modal */}
       {selectedReceipt && (
         <div className="modal-overlay" onClick={() => setSelectedReceipt(null)}>
@@ -166,6 +322,12 @@ export default function PaymentsPage({ currentUser }) {
             </div>
 
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              {selectedReceipt.student_name && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: '#64748b' }}>O'quvchi:</span>
+                  <strong>{selectedReceipt.student_name}</strong>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                 <span style={{ color: '#64748b' }}>To'lov miqdori:</span>
                 <strong style={{ fontSize: '16px', color: '#2563eb' }}>{parseFloat(selectedReceipt.amount).toLocaleString()} UZS</strong>

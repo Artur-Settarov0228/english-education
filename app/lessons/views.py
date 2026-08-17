@@ -19,8 +19,17 @@ from app.lessons.tasks import upload_lesson_video_to_youtube_task
 logger = logging.getLogger(__name__)
 
 class GroupViewSet(viewsets.ModelViewSet):
-    queryset = Group.objects.all()
     serializer_class = GroupSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Group.objects.all()
+        if hasattr(user, 'role') and user.role == 'student':
+            active_group_ids = Enrollment.objects.filter(student=user, status='active').values_list('group_id', flat=True)
+            queryset = queryset.filter(id__in=active_group_ids)
+        elif hasattr(user, 'role') and user.role == 'teacher':
+            queryset = queryset.filter(teacher=user)
+        return queryset
 
     @action(detail=True, methods=['get'])
     def students(self, request, pk=None):
@@ -49,7 +58,14 @@ class LessonViewSet(viewsets.ModelViewSet):
     serializer_class = LessonSerializer
 
     def get_queryset(self):
+        user = self.request.user
         queryset = Lesson.objects.all()
+        if hasattr(user, 'role') and user.role == 'student':
+            active_group_ids = Enrollment.objects.filter(student=user, status='active').values_list('group_id', flat=True)
+            queryset = queryset.filter(group_id__in=active_group_ids)
+        elif hasattr(user, 'role') and user.role == 'teacher':
+            queryset = queryset.filter(group__teacher=user)
+
         group_id = self.request.query_params.get('group')
         if group_id:
             queryset = queryset.filter(group_id=group_id)
@@ -118,8 +134,14 @@ class CourseViewSet(viewsets.ModelViewSet):
     serializer_class = CourseSerializer
 
 class EnrollmentViewSet(viewsets.ModelViewSet):
-    queryset = Enrollment.objects.all()
     serializer_class = EnrollmentSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Enrollment.objects.all()
+        if hasattr(user, 'role') and user.role == 'student':
+            queryset = queryset.filter(student=user)
+        return queryset
 
 class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.all()

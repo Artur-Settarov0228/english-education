@@ -250,6 +250,23 @@ export const taskService = {
     const url = studentId ? `/Tasks/badges/?student=${studentId}` : '/Tasks/badges/';
     const res = await api.get(url);
     return res.data.results || res.data;
+  },
+  getVocabularySets: async (groupId = null) => {
+    const url = groupId ? `/Tasks/vocab-sets/?group=${groupId}` : '/Tasks/vocab-sets/';
+    const res = await api.get(url);
+    return res.data.results || res.data;
+  },
+  createVocabularySet: async (setData) => {
+    const res = await api.post('/Tasks/vocab-sets/', setData);
+    return res.data;
+  },
+  createVocabularyWord: async (wordData) => {
+    const res = await api.post('/Tasks/vocab-words/', wordData);
+    return res.data;
+  },
+  deleteVocabularySet: async (id) => {
+    const res = await api.delete(`/Tasks/vocab-sets/${id}/`);
+    return res.data;
   }
 };
 

@@ -2,32 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Folder, FileText, Download, Play, 
   ExternalLink, Search, Clock, User, CheckCircle, 
-  Sparkles, RefreshCw, Layers
+  Sparkles, RefreshCw, Layers, GraduationCap
 } from 'lucide-react';
-import { lessonService, authService } from '../services/api';
+import { lessonService } from '../services/api';
 
 export default function CoursesPage({ currentUser }) {
   const [courses, setCourses] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState('courses'); // 'courses' or 'materials'
+  const [activeTab, setActiveTab] = useState('my-courses'); // 'my-courses', 'catalog', 'materials'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [selectedCourseForModal, setSelectedCourseForModal] = useState(null);
 
+  const isStudent = !currentUser?.role || currentUser?.role === 'student';
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [coursesRes, groupsRes, materialsRes] = await Promise.all([
+      const [coursesRes, groupsRes, enrollmentsRes, materialsRes] = await Promise.all([
         lessonService.getCourses(),
         lessonService.getGroups(),
+        lessonService.getEnrollments(),
         lessonService.getMaterials()
       ]);
 
       setCourses(Array.isArray(coursesRes) ? coursesRes : []);
       setGroups(Array.isArray(groupsRes) ? groupsRes : []);
+      setEnrollments(Array.isArray(enrollmentsRes) ? enrollmentsRes : []);
       setMaterials(Array.isArray(materialsRes) ? materialsRes : []);
     } catch (err) {
       console.error("Error fetching courses data:", err);
@@ -39,6 +44,15 @@ export default function CoursesPage({ currentUser }) {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Filtered enrolled groups for the student
+  const myEnrolledGroups = groups.filter(g => {
+    // If backend already filtered groups for student, all returned groups are student's groups
+    if (isStudent) {
+      return true;
+    }
+    return true;
+  });
 
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -61,17 +75,25 @@ export default function CoursesPage({ currentUser }) {
             Kurslar va O'quv Materiallari
           </h2>
           <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-            Siz o'rganayotgan darsliklar, PDF qo'llanmalar va audio resurslar
+            Siz o'rganayotgan darsliklar, guruhlar va qo'llanmalar
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button 
-            className={`btn ${activeTab === 'courses' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('courses')}
+            className={`btn ${activeTab === 'my-courses' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('my-courses')}
+          >
+            <GraduationCap size={16} />
+            <span>Mening Guruhlarim ({myEnrolledGroups.length})</span>
+          </button>
+
+          <button 
+            className={`btn ${activeTab === 'catalog' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('catalog')}
           >
             <BookOpen size={16} />
-            <span>Kurslar & Guruhlar</span>
+            <span>Barcha Kurslar</span>
           </button>
 
           <button 
@@ -94,14 +116,14 @@ export default function CoursesPage({ currentUser }) {
           <Search size={18} color="#94a3b8" />
           <input 
             type="text"
-            placeholder="Kurs yoki material nomini qidiring..."
+            placeholder="Kurs, guruh yoki material nomini qidiring..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ border: 'none', outline: 'none', width: '100%', fontSize: '14px', background: 'transparent' }}
           />
         </div>
 
-        {activeTab === 'courses' && (
+        {activeTab === 'catalog' && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Daraja:</span>
             {['All', 'A1', 'A2', 'B1', 'B2', 'C1'].map(lvl => (
@@ -126,8 +148,84 @@ export default function CoursesPage({ currentUser }) {
         )}
       </div>
 
-      {/* Tab 1: Courses & Groups */}
-      {activeTab === 'courses' && (
+      {/* Tab 1: My Enrolled Groups */}
+      {activeTab === 'my-courses' && (
+        loading ? (
+          <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>Guruhlar yuklanmoqda...</div>
+        ) : myEnrolledGroups.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
+            <GraduationCap size={40} color="#94a3b8" style={{ margin: '0 auto 12px auto' }} />
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>
+              Siz hozircha hech qaysi guruhga a'zo emassiz
+            </h3>
+            <p style={{ fontSize: '13px', margin: 0 }}>
+              Guruhga biriktirish uchun o'quv markazi ma'muriyatiga murojaat qiling yoki "Barcha Kurslar" katalogini ko'ring.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            {myEnrolledGroups.map((group) => {
+              const matchedCourse = courses.find(c => c.id === group.course);
+              const groupMaterials = materials.filter(m => m.course === group.course);
+
+              return (
+                <div 
+                  key={group.id} 
+                  className="card" 
+                  style={{ 
+                    padding: '24px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'space-between',
+                    border: '1px solid #bfdbfe',
+                    background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                      <span className="badge badge-active" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: '800' }}>
+                        Mening Guruhim
+                      </span>
+                      <span className="badge badge-active">Faol (Active)</span>
+                    </div>
+
+                    <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '4px' }}>
+                      {group.name}
+                    </h3>
+                    <div style={{ fontSize: '13px', color: '#2563eb', fontWeight: '700', marginBottom: '14px' }}>
+                      Kurs: {matchedCourse?.name || 'Ingliz tili kursi'}
+                    </div>
+
+                    <div style={{ background: '#f1f5f9', padding: '12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
+                        <Clock size={14} color="#2563eb" />
+                        <span>Dars Jadvali: <strong>{group.schedule || 'Har kuni'}</strong></span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
+                        <Folder size={14} color="#16a34a" />
+                        <span>O'quv Materiallari: <strong>{groupMaterials.length} ta mavjud</strong></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ flex: 1, justifyContent: 'center', fontSize: '13px' }}
+                      onClick={() => setSelectedCourseForModal({ ...(matchedCourse || { name: group.name }), groups: [group], materials: groupMaterials })}
+                    >
+                      <span>Materiallarni Ochish</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Tab 2: All Courses Catalog */}
+      {activeTab === 'catalog' && (
         loading ? (
           <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>Kurslar yuklanmoqda...</div>
         ) : filteredCourses.length === 0 ? (
@@ -137,7 +235,6 @@ export default function CoursesPage({ currentUser }) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
             {filteredCourses.map((course) => {
-              // Find groups belonging to this course
               const courseGroups = groups.filter(g => g.course === course.id);
               const courseMaterials = materials.filter(m => m.course === course.id);
 
@@ -150,7 +247,6 @@ export default function CoursesPage({ currentUser }) {
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'space-between',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
                     cursor: 'pointer'
                   }}
                   onClick={() => setSelectedCourseForModal({ ...course, groups: courseGroups, materials: courseMaterials })}
@@ -173,10 +269,9 @@ export default function CoursesPage({ currentUser }) {
                   </div>
 
                   <div>
-                    {/* Course Groups info */}
                     <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
-                        Biriktirilgan Guruhlar ({courseGroups.length}):
+                        Guruhlar ({courseGroups.length}):
                       </div>
                       {courseGroups.length === 0 ? (
                         <div style={{ fontSize: '12px', color: '#94a3b8' }}>Hozircha guruhlar yo'q</div>
@@ -206,7 +301,7 @@ export default function CoursesPage({ currentUser }) {
         )
       )}
 
-      {/* Tab 2: Study Materials (PDF & Audio) */}
+      {/* Tab 3: Study Materials (PDF & Audio) */}
       {activeTab === 'materials' && (
         loading ? (
           <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>Materiallar yuklanmoqda...</div>
